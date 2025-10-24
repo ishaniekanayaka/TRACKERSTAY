@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "pet-care-tracker",
-    "slug": "pet-care-tracker",
+    "name": "trackerstay",
+    "slug": "trackerstay",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/image.png",
-    "scheme": "petcaretracker",
+    "scheme": "trackerstay",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -13,27 +13,34 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/image.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.ishaniekanayake.petcaretracker"
+      "package": "com.ishaniekanayake.trackerstay",
+      "useNextNotificationsApi": true,
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/image.png"
     },
     "plugins": [
       "expo-router",
-    
       "expo-dev-client",
-      "expo-notifications",
-
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#ffffff",
+          "defaultChannel": "default"
+        }
+      ],
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
@@ -46,7 +53,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "7f24232b-68fc-4bf1-a658-f88e5d56c404"
+        "projectId": "090e95f8-5f76-4ece-a6ff-0ce737fef150"
       }
     }
   }

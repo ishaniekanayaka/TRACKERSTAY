@@ -37,7 +37,14 @@ const DashboardLayout = () => {
             ),
           }}
         />
-        
+        <Tabs.Screen
+          name="debug"
+          options={{
+            tabBarIcon: ({ color, size }) => (
+              <MaterialIcons name="bug-report" color={color} size={size} />
+            ),
+          }}
+        />
       </Tabs>
     </SafeAreaView>
   );
