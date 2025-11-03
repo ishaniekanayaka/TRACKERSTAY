@@ -4,27 +4,34 @@
     "slug": "trackerstay",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/image.png",
+    "icon": "./assets/images/image_new.png",
     "scheme": "trackerstay",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ishaniekanayake.trackerstay"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/image.png",
+        "foregroundImage": "./assets/images/image_new.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.ishaniekanayake.trackerstay",
       "useNextNotificationsApi": true,
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/image.png"
+      "favicon": "./assets/images/image_new.png"
     },
     "plugins": [
       "expo-router",
@@ -34,16 +41,30 @@
         {
           "icon": "./assets/images/notification-icon.png",
           "color": "#ffffff",
-          "defaultChannel": "default"
+          "defaultChannel": "default",
+          "mode": "production"
         }
       ],
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/image.png",
+          "image": "./assets/images/image_new.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0",
+            "enableProguardInReleaseBuilds": true,
+            "useLegacyPackaging": true,
+            "enableMinifyInReleaseBuilds": true
+          }
         }
       ]
     ],
@@ -51,10 +72,21 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {},
+      "router": {
+        "origin": false
+      },
       "eas": {
-        "projectId": "090e95f8-5f76-4ece-a6ff-0ce737fef150"
+        "projectId": "e4132c2f-9bd1-4a5d-a197-8ebaae118d0a"
       }
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#ffffff"
+    },
+    "notification": {
+      "icon": "./assets/images/notification-icon.png",
+      "color": "#ffffff",
+      "iosDisplayInForeground": true,
+      "androidMode": "default"
     }
   }
 }
