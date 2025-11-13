@@ -1,7 +1,5 @@
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../config/apiConfig";
-import * as Notifications from 'expo-notifications';
 
 interface LoginResponse {
   token: string;
@@ -9,6 +7,7 @@ interface LoginResponse {
   user: any;
 }
 
+// ✅ LOGIN FUNCTION
 export const login = async (
   email: string,
   password: string,
@@ -20,157 +19,109 @@ export const login = async (
     formData.append("password", password);
     formData.append("device_name", device_name);
 
-    console.log("🔐 Attempting login for:", email);
-    
     const response = await api.post<LoginResponse>("/login", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
-    console.log("✅ Login response:", response.data);
-
-    // Validate response structure
-    if (!response.data) {
-      throw new Error("No response data received");
+    if (!response.data?.token || !response.data?.user) {
+      throw new Error("Invalid login response from server");
     }
 
-    if (!response.data.token) {
-      throw new Error("No token received from server");
-    }
-
-    if (!response.data.user) {
-      throw new Error("No user data received from server");
-    }
-
-    // Store the complete response including token and user
     await AsyncStorage.setItem("@user_data", JSON.stringify(response.data));
-    
-    console.log("✅ User data stored successfully");
+    console.log("✅ User data saved to storage");
     return response.data;
-
   } catch (error: any) {
-    console.error("❌ Login error:", {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status
-    });
-    
-    // Create a more user-friendly error message
+    console.error("❌ Login error:", error.response?.data || error.message);
     if (error.response?.status === 401) {
       throw new Error("Invalid email or password");
-    } else if (error.response?.status >= 500) {
-      throw new Error("Server error. Please try again later.");
-    } else if (error.message.includes("Network Error")) {
-      throw new Error("Network error. Please check your connection.");
-    } else {
-      throw new Error(error.response?.data?.message || "Login failed. Please try again.");
     }
+    throw new Error(error.response?.data?.message || "Login failed");
   }
 };
 
-export const registerDeviceToken = async (deviceToken: string): Promise<void> => {
+// ✅ REGISTER DEVICE TOKEN - Backend එකට token එක save කරනවා
+export const registerDeviceToken = async (
+  deviceToken: string,
+  deviceType: string = "android"
+): Promise<boolean> => {
   try {
-    const storedData = await AsyncStorage.getItem("@user_data");
-    if (!storedData) {
-      throw new Error("No user data found");
+    if (!deviceToken) {
+      console.error("❌ Device token is required");
+      return false;
     }
 
-    const parsedData = JSON.parse(storedData);
-    const token = parsedData?.token;
+    console.log("📡 Sending token to backend...");
+    console.log("Token:", deviceToken.substring(0, 50) + "...");
+    console.log("Device:", deviceType);
 
-    if (!token) {
-      throw new Error("No authentication token found");
-    }
+    const payload = {
+      device_token: deviceToken,
+      device_type: deviceType,
+    };
 
-    console.log("📱 Registering device token:", deviceToken);
-    
-    const response = await api.post(
-      "/user/device-token",
-      {
-        device_token: deviceToken,
+    // ✅ CORRECT ENDPOINT: /user/device-token (singular)
+    const res = await api.post("/user/device-token", payload, {
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
       },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    console.log("✅ Device token registered successfully:", response.data);
-  } catch (error: any) {
-    console.error("❌ Device token registration error:", {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status
     });
+
+    console.log("✅ Backend Response:", res.data);
+    console.log("✅ Device token successfully registered to database!");
+    return true;
+
+  } catch (error: any) {
+    // Error handling but don't throw - app should continue working
+    const statusCode = error.response?.status;
+    const errorData = error.response?.data;
     
-    // Don't throw error for device token registration failures
-    // as it shouldn't block the main app functionality
-    console.warn("⚠️ Device token registration failed, but continuing...");
+    console.error("❌ Token registration failed:");
+    console.error("Status:", statusCode);
+    console.error("Error:", errorData?.message || error.message);
+    console.error("Full error:", JSON.stringify(errorData, null, 2));
+    
+    // Network errors හෝ server errors නම් app එක crash වෙන්නේ නැහැ
+    if (!error.response) {
+      console.error("Network error - no response from server");
+    } else if (statusCode === 401) {
+      console.error("Unauthorized - user may need to login");
+    } else if (statusCode >= 500) {
+      console.error("Server error - backend issue");
+    }
+    
+    console.warn("⚠️ App will continue without registered device token");
+    return false;
   }
 };
 
+// ✅ LOGOUT FUNCTION
 export const logout = async (): Promise<void> => {
   try {
-    const storedData = await AsyncStorage.getItem("@user_data");
-    if (!storedData) {
-      console.log("No user data found for logout");
-      return;
-    }
-
-    const parsedData = JSON.parse(storedData);
-    const token = parsedData?.token;
-
-    if (token) {
-      await api.post(
-        "/logout",
-        {},
-        { 
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json" 
-          } 
-        }
-      );
-      console.log("✅ Logout successful");
-    }
-
+    console.log("🚪 Calling logout API...");
+    await api.post("/logout", {});
+    console.log("✅ Logout API successful");
   } catch (error: any) {
-    console.error("❌ Logout error:", {
-      message: error.message,
-      response: error.response?.data
-    });
-    // Even if logout API fails, clear local storage
+    console.error("❌ Logout API error (continuing anyway):", 
+      error.response?.data || error.message
+    );
   } finally {
     // Always clear local storage
     await AsyncStorage.removeItem("@user_data");
-    console.log("✅ Local storage cleared");
+    console.log("✅ User data cleared from storage");
+    
+    // Note: Token එක clear කරන්නේ නැහැ මෙතනින්
+    // Token එක තවමත් device එකේ ඉන්නවා next login එකට
   }
 };
 
+// ✅ GET CURRENT USER
 export const getCurrentUser = async (): Promise<any> => {
   try {
-    const response = await api.get("/me");
-    console.log("✅ Current user data:", response.data);
-    return response.data;
-  } catch (error: any) {
-    console.error("❌ User info error:", {
-      message: error.message,
-      response: error.response?.data
-    });
-    return null;
-  }
-};
-
-export const isAuthenticated = async (): Promise<boolean> => {
-  try {
-    const storedData = await AsyncStorage.getItem("@user_data");
-    if (!storedData) return false;
-
-    const parsedData = JSON.parse(storedData);
-    return !!(parsedData?.token && parsedData?.user);
+    const res = await api.get("/me");
+    return res.data;
   } catch (error) {
-    console.error("Error checking authentication:", error);
-    return false;
+    console.error("❌ Get current user error:", error);
+    return null;
   }
 };

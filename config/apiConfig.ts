@@ -6,86 +6,65 @@ export const BASE_URL = "https://demo.trackerstay.com/api";
 
 const api = axios.create({
   baseURL: BASE_URL,
-  headers: { 
-    "Accept": "application/json",
-    "Content-Type": "application/json"
+  headers: {
+    Accept: "application/json",
+    "Content-Type": "application/json",
   },
   timeout: 15000,
 });
 
-// 🔹 Attach token automatically with enhanced error handling
+// Attach JWT token automatically
 api.interceptors.request.use(
   async (config) => {
     try {
       const storedData = await AsyncStorage.getItem("@user_data");
       if (storedData) {
-        const parsedData = JSON.parse(storedData);
-        const token = parsedData?.token;
-        if (token) {
+        const parsed = JSON.parse(storedData);
+        const token = parsed?.token;
+        if (token && config.headers) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log('🔐 Token attached to request');
         }
       }
-    } catch (error) {
-      console.error("Error attaching token:", error);
+    } catch (err) {
+      console.error("Request interceptor error:", err);
     }
     return config;
   },
-  (error) => {
-    console.error("Request interceptor error:", error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// 🔹 Handle token expiry silently with enhanced logic
+// Handle unauthorized or server errors globally
 let isLoggingOut = false;
-
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (res) => res,
   async (error) => {
-    // Handle network errors
     if (!error.response) {
-      console.error("🌐 Network error:", error.message);
-      return Promise.reject(new Error("Network error. Please check your internet connection."));
+      return Promise.reject(new Error("Network error. Check your connection."));
     }
 
-    // Handle 401 Unauthorized (token expired)
-    if (error.response?.status === 401 && !isLoggingOut) {
-      isLoggingOut = true;
-      console.warn("⚠️ Token expired or invalid — redirecting to login");
+    const status = error.response.status;
 
+    if (status === 401 && !isLoggingOut) {
+      isLoggingOut = true;
       try {
         await AsyncStorage.removeItem("@user_data");
-        await AsyncStorage.removeItem('@expo_push_token');
-        console.log('🗑️ Storage cleared due to token expiry');
-      } catch (storageError) {
-        console.error("Error clearing storage:", storageError);
+        await AsyncStorage.removeItem("@expo_push_token");
+      } catch (e) {
+        console.error("Error clearing storage after 401:", e);
       }
-
       setTimeout(() => {
         router.replace("/login");
         isLoggingOut = false;
-      }, 1500);
-      
-      return Promise.reject(new Error("Session expired. Please login again."));
+      }, 1200);
+      return Promise.reject(new Error("Session expired. Please log in again."));
     }
 
-    // Handle server errors
-    if (error.response?.status >= 500) {
-      console.error("🚨 Server error:", error.response.status);
+    if (status >= 500) {
       return Promise.reject(new Error("Server error. Please try again later."));
     }
 
-    // For other errors, reject with proper message
-    const message = error.response?.data?.message || error.message || "An error occurred";
-    console.error("❌ API Error:", {
-      status: error.response?.status,
-      message: message,
-      url: error.config?.url
-    });
-    
+    const message =
+      error.response?.data?.message || error.message || "An error occurred";
     return Promise.reject(new Error(message));
   }
 );

@@ -1,16 +1,15 @@
 
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { 
-  login as apiLogin, 
-  logout as apiLogout, 
-  isAuthenticated, 
-  registerDeviceToken 
-} from '@/services/authService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
-import * as Device from 'expo-device';
+import React, { createContext, useState, useContext, useEffect } from "react";
+import {
+  login as apiLogin,
+  logout as apiLogout,
+  registerDeviceToken,
+} from "@/services/authService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+import { Platform } from "react-native";
+import { router } from "expo-router";
 
 interface AuthContextType {
   user: any;
@@ -18,238 +17,273 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  registerPushToken: () => Promise<void>;
   expoPushToken: string | null;
+  registerPushToken: () => Promise<void>;
+  isTokenRegistered: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Configure notifications
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
-    shouldShowBanner: Platform.OS === 'ios',
-    shouldShowList: Platform.OS === 'ios',
+    shouldShowBanner: Platform.OS === "ios",
+    shouldShowList: Platform.OS === "ios",
   }),
 });
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [authStatus, setAuthStatus] = useState(false);
+  const [isAuth, setIsAuth] = useState(false);
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
+  const [isTokenRegistered, setIsTokenRegistered] = useState(false);
 
   useEffect(() => {
-    loadUserFromStorage();
-    setupPushNotifications();
+    initializeApp();
   }, []);
 
-  const setupPushNotifications = async (): Promise<void> => {
+  // ✅ Monitor expoPushToken changes and auto-register
+  useEffect(() => {
+    if (expoPushToken && !isTokenRegistered) {
+      // Call async function inside useEffect
+      const registerToken = async () => {
+        await autoRegisterToken();
+      };
+      registerToken();
+    }
+  }, [expoPushToken, isTokenRegistered]);
+
+  // ✅ AUTO REGISTER TOKEN - When token is generated
+  const autoRegisterToken = async (): Promise<void> => {
     try {
-      console.log('📱 Setting up push notifications...');
-      
-      // Check if running on a physical device
-      if (!Device.isDevice) {
-        console.log('⚠️ Push notifications not supported on emulators');
+      if (!expoPushToken) {
+        console.log("⚠️ No token available to register");
         return;
       }
 
-      // Request permissions
+      console.log("🔄 Auto-registering token to database...");
+      
+      // ✅ registerDeviceToken returns boolean now
+      const success = await registerDeviceToken(expoPushToken, Platform.OS);
+      
+      if (success) {
+        setIsTokenRegistered(true);
+        console.log("✅ Token auto-registered successfully!");
+      } else {
+        console.log("⚠️ Token auto-registration failed");
+      }
+    } catch (error) {
+      console.error("❌ Auto registration error:", error);
+    }
+  };
+
+  // ✅ MAIN INITIALIZATION - App boot වෙද්දී run වෙනවා
+  const initializeApp = async (): Promise<void> => {
+    try {
+      console.log("🚀 App initializing...");
+      
+      // 1️⃣ Setup push notifications FIRST
+      await setupPushNotifications();
+      
+      // 2️⃣ Then load user data
+      await loadUserFromStorage();
+      
+    } catch (e) {
+      console.error("❌ App initialization error:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ LOAD USER - AsyncStorage එකෙන් user data load කරනවා
+  const loadUserFromStorage = async (): Promise<void> => {
+    try {
+      const stored = await AsyncStorage.getItem("@user_data");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setUser(parsed.user);
+        setIsAuth(true);
+        console.log("✅ User loaded from storage:", parsed.user?.email);
+
+        // User ඉන්නවා නම් token register කරන්න try කරනවා
+        const token = await AsyncStorage.getItem("@expo_push_token");
+        if (token) {
+          console.log("📤 Re-registering token for existing user...");
+          const success = await registerDeviceToken(token, Platform.OS);
+          if (success) {
+            setIsTokenRegistered(true);
+          }
+        }
+      } else {
+        console.log("ℹ️ No user data in storage");
+      }
+    } catch (e) {
+      console.error("❌ loadUserFromStorage error:", e);
+    }
+  };
+
+  // ✅ SETUP PUSH NOTIFICATIONS - FCM token generate කරනවා
+  const setupPushNotifications = async (): Promise<void> => {
+    try {
+      if (!Device.isDevice) {
+        console.warn("⚠️ Push notifications need physical device");
+        return;
+      }
+
+      console.log("🔔 Requesting notification permissions...");
+
+      // Permission request කරනවා
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
       
-      if (existingStatus !== 'granted') {
+      if (existingStatus !== "granted") {
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
       }
-      
-      if (finalStatus !== 'granted') {
-        console.log('⚠️ Push notification permission not granted');
+
+      if (finalStatus !== "granted") {
+        console.warn("⚠️ Notification permission denied");
         return;
       }
 
-      console.log('✅ Push notification permission granted');
+      console.log("✅ Notification permission granted");
 
-      // Get the Expo push token
-      try {
-        // const tokenData = await Notifications.getExpoPushTokenAsync({
-        //   projectId: "090e95f8-5f76-4ece-a6ff-0ce737fef150" // FIXED: Consistent project ID
-        // });
-        
-        // const token = tokenData.data;
-        // console.log('📱 Expo Push Token:', token);
-        
-        // setExpoPushToken(token);
-        // await AsyncStorage.setItem('@expo_push_token', token);
+      // FCM token generate කරනවා
+      const tokenData = await Notifications.getDevicePushTokenAsync();
+      const token = tokenData?.data;
 
-        // ✅ NEW: Use FCM Device Token for Development Build
-        const tokenData = await Notifications.getDevicePushTokenAsync();
-        const fcmToken = tokenData.data;
-        console.log('🔥 FCM Device Token:', fcmToken);
-
-        setExpoPushToken(fcmToken);
-        await AsyncStorage.setItem('@expo_push_token', fcmToken);
-
-
-        // Create notification channel for Android
-        if (Platform.OS === 'android') {
-          await Notifications.setNotificationChannelAsync('default', {
-            name: 'default',
-            importance: Notifications.AndroidImportance.MAX,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: '#FF231F7C',
-          });
-        }
-
-      } catch (tokenError: any) {
-        console.error('❌ Error getting push token:', tokenError.message);
+      if (!token) {
+        console.warn("⚠️ No FCM token generated");
+        return;
       }
-      
-    } catch (error: any) {
-      console.error('❌ Error setting up push notifications:', error.message);
+
+      console.log("🎯 FCM Token generated:", token.substring(0, 50) + "...");
+
+      // Token save කරනවා state එකට සහ AsyncStorage එකට
+      setExpoPushToken(token);
+      await AsyncStorage.setItem("@expo_push_token", token);
+      console.log("💾 Token saved to AsyncStorage");
+
+      // ✅ Token auto-registration happens via useEffect monitoring expoPushToken
+
+      // Android notification channel setup
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "default",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#FF231F7C",
+        });
+        console.log("✅ Android notification channel configured");
+      }
+
+    } catch (err: any) {
+      console.error("❌ setupPushNotifications error:", err.message || err);
     }
   };
 
+  // ✅ MANUAL REGISTER - Debug screen එකෙන් manually register කරන්න
   const registerPushToken = async (): Promise<void> => {
     try {
-      let pushToken = expoPushToken;
-      
-      if (!pushToken) {
-        pushToken = await AsyncStorage.getItem('@expo_push_token');
+      const token = await AsyncStorage.getItem("@expo_push_token");
+      if (!token) {
+        console.warn("⚠️ No token found to register");
+        return;
       }
 
-      if (pushToken && authStatus) {
-        console.log('📱 Registering push token with backend...');
-        await registerDeviceToken(pushToken);
+      console.log("📤 Manually registering token...");
+      const success = await registerDeviceToken(token, Platform.OS);
+      
+      if (success) {
+        setIsTokenRegistered(true);
+        console.log("✅ Manual registration successful");
       } else {
-        console.log('⚠️ No push token available for registration');
+        console.error("❌ Manual registration failed");
       }
-    } catch (error: any) {
-      console.error('❌ Error registering push token:', error.message);
+    } catch (error) {
+      console.error("❌ registerPushToken error:", error);
+      throw error;
     }
   };
 
-  const loadUserFromStorage = async (): Promise<void> => {
-    try {
-      console.log("🔄 Loading user from storage...");
-      const storedData = await AsyncStorage.getItem('@user_data');
-      
-      if (storedData) {
-        const userData = JSON.parse(storedData);
-        console.log("📦 Stored data found");
-        
-        // Validate stored data structure
-        if (userData && userData.user && userData.token) {
-          setUser(userData.user);
-          setAuthStatus(true);
-          console.log("✅ User loaded successfully:", userData.user.email);
-          
-          // Register device token after user is loaded
-          setTimeout(() => {
-            registerPushToken();
-          }, 3000);
-        } else {
-          console.warn("⚠️ Invalid stored data structure, clearing...");
-          await AsyncStorage.removeItem('@user_data');
-          setUser(null);
-          setAuthStatus(false);
-        }
-      } else {
-        console.log("📭 No stored user data found");
-        setUser(null);
-        setAuthStatus(false);
-      }
-    } catch (error: any) {
-      console.error('❌ Error loading user from storage:', error.message);
-      // Clear corrupted data
-      await AsyncStorage.removeItem('@user_data');
-      setUser(null);
-      setAuthStatus(false);
-    } finally {
-      setLoading(false);
-      console.log("🏁 Auth loading complete");
-    }
-  };
-
+  // ✅ LOGIN - User login වෙද්දී token re-register කරනවා
   const handleLogin = async (email: string, password: string): Promise<void> => {
     try {
       setLoading(true);
-      console.log("🔐 Starting login process...");
+      console.log("🔐 Logging in user:", email);
       
-      const userData = await apiLogin(email, password);
-      
-      // Update state with the new user data
-      setUser(userData.user);
-      setAuthStatus(true);
-      
-      console.log("✅ Login successful, user:", userData.user.email);
-      
-      // Wait a bit then register device token
-      setTimeout(async () => {
-        await registerPushToken();
-      }, 2000);
-      
-      // Navigate to dashboard
-      router.replace('/dashboard/home');
-      
-    } catch (error: any) {
-      console.error('❌ Login failed:', error.message);
-      // Clear any partial data on login failure
-      await AsyncStorage.removeItem('@user_data');
+      const res = await apiLogin(email, password);
+      setUser(res.user);
+      setIsAuth(true);
+      console.log("✅ Login successful");
+
+      // Login වෙලා user ඉන්නවා නම් token එක backend එකට යවනවා
+      const token = await AsyncStorage.getItem("@expo_push_token");
+      if (token) {
+        console.log("📤 Registering token after login...");
+        const success = await registerDeviceToken(token, Platform.OS);
+        if (success) {
+          setIsTokenRegistered(true);
+        }
+      } else {
+        console.warn("⚠️ No token found after login");
+      }
+
+      router.replace("/dashboard/home");
+    } catch (err: any) {
+      console.error("❌ Login failed:", err.message || err);
+      await AsyncStorage.removeItem("@user_data");
       setUser(null);
-      setAuthStatus(false);
-      throw error;
+      setIsAuth(false);
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ LOGOUT - User logout වෙද්දී cleanup කරනවා
   const handleLogout = async (): Promise<void> => {
+    setLoading(true);
     try {
-      setLoading(true);
-      console.log("🚪 Starting logout process...");
-      
+      console.log("🚪 Logging out...");
       await apiLogout();
-      
-    } catch (error: any) {
-      console.error('❌ Logout API error:', error.message);
     } finally {
-      // Always clear local state
       setUser(null);
-      setAuthStatus(false);
-      await AsyncStorage.removeItem('@user_data');
-      await AsyncStorage.removeItem('@expo_push_token');
-      setExpoPushToken(null);
+      setIsAuth(false);
+      setIsTokenRegistered(false);
+      await AsyncStorage.removeItem("@user_data");
+      // ⚠️ Token එක clear කරන්නේ නැහැ - app එක තවමත් installed
+      console.log("✅ Logout complete");
       setLoading(false);
-      
-      console.log("✅ Logout complete, redirecting to login");
-      router.replace('/login');
+      router.replace("/login");
     }
-  };
-
-  const value: AuthContextType = {
-    user,
-    loading,
-    isAuthenticated: authStatus,
-    login: handleLogin,
-    logout: handleLogout,
-    registerPushToken,
-    expoPushToken,
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        isAuthenticated: isAuth,
+        login: handleLogin,
+        logout: handleLogout,
+        expoPushToken,
+        registerPushToken,
+        isTokenRegistered,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
+  return ctx;
 };
