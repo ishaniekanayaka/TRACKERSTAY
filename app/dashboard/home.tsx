@@ -20,6 +20,9 @@ import { useNavigation } from '@react-navigation/native';
 import { TabType, Booking, BookingData, PaymentInfo, StatusStyle } from './../../types/booking';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from "expo-router";
+import { useNotification } from '@/context/NotificationContext';
+import { NotificationItem } from './../../types/notification';
+
 
 interface UserData {
   id: number;
@@ -40,6 +43,14 @@ interface UserData {
 const Home = () => {
   const navigation = useNavigation();
   const router = useRouter();
+  const { 
+    notifications, 
+    unseenCount, 
+    markAllAsSeen, 
+    clearNotifications, 
+    markAsSeen 
+  } = useNotification();
+  
   const [activeTab, setActiveTab] = useState<TabType>('arrivals');
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
@@ -51,12 +62,14 @@ const Home = () => {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
   const detailsSlideAnim = useRef(new Animated.Value(0)).current;
   const detailsFadeAnim = useRef(new Animated.Value(0)).current;
   const dropdownAnim = useRef(new Animated.Value(0)).current;
+  const notificationDropdownAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadBookingDetails();
@@ -101,6 +114,14 @@ const Home = () => {
       useNativeDriver: true,
     }).start();
   }, [showUserDropdown]);
+
+  useEffect(() => {
+    Animated.timing(notificationDropdownAnim, {
+      toValue: showNotificationDropdown ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [showNotificationDropdown]);
 
   const loadUserData = async () => {
     try {
@@ -251,6 +272,55 @@ const Home = () => {
       .join('')
       .toUpperCase()
       .substring(0, 2);
+  };
+
+  const handleNotificationPress = () => {
+    setShowNotificationDropdown(!showNotificationDropdown);
+    setShowUserDropdown(false);
+  };
+
+  const handleMarkAllAsSeen = async () => {
+    await markAllAsSeen();
+  };
+
+  const handleClearNotifications = async () => {
+    Alert.alert(
+      "Clear Notifications",
+      "Are you sure you want to clear all notifications?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            await clearNotifications();
+            setShowNotificationDropdown(false);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleNotificationItemPress = async (notification: NotificationItem) => {
+    await markAsSeen(notification.id);
+    // You can add additional logic here for navigating to specific screens
+    // based on the notification content
+    setShowNotificationDropdown(false);
+  };
+
+  const formatNotificationTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
   };
 
   const renderStatCard = (
@@ -585,6 +655,96 @@ const Home = () => {
     );
   };
 
+  const renderNotificationDropdown = () => {
+    const notificationScale = notificationDropdownAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.9, 1],
+    });
+
+    const notificationTranslateY = notificationDropdownAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [-10, 0],
+    });
+
+    return (
+      <Animated.View 
+        style={[
+          s.notificationDropdown,
+          {
+            opacity: notificationDropdownAnim,
+            transform: [
+              { scale: notificationScale },
+              { translateY: notificationTranslateY }
+            ]
+          }
+        ]}
+      >
+        <View style={s.notificationHeader}>
+          <Text style={s.notificationTitle}>Notifications</Text>
+          <View style={s.notificationActions}>
+            {unseenCount > 0 && (
+              <TouchableOpacity 
+                onPress={handleMarkAllAsSeen}
+                style={s.notificationActionButton}
+              >
+                <Ionicons name="checkmark-done-outline" size={18} color="#6B5B95" />
+                <Text style={s.notificationActionText}>Mark all read</Text>
+              </TouchableOpacity>
+            )}
+            {notifications.length > 0 && (
+              <TouchableOpacity 
+                onPress={handleClearNotifications}
+                style={s.notificationActionButton}
+              >
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                <Text style={[s.notificationActionText, { color: '#EF4444' }]}>Clear all</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        <ScrollView style={s.notificationList} showsVerticalScrollIndicator={false}>
+          {notifications.length === 0 ? (
+            <View style={s.noNotificationsContainer}>
+              <Ionicons name="notifications-off-outline" size={48} color="#9CA3AF" />
+              <Text style={s.noNotificationsText}>No notifications</Text>
+              <Text style={s.noNotificationsSubtext}>You're all caught up!</Text>
+            </View>
+          ) : (
+            notifications.map((notification) => (
+              <TouchableOpacity
+                key={notification.id}
+                onPress={() => handleNotificationItemPress(notification)}
+                style={[
+                  s.notificationItem,
+                  !notification.seen && s.unseenNotificationItem
+                ]}
+              >
+                <View style={s.notificationItemHeader}>
+                  <Text style={[
+                    s.notificationItemTitle,
+                    !notification.seen && s.unseenNotificationTitle
+                  ]}>
+                    {notification.title}
+                  </Text>
+                  {!notification.seen && (
+                    <View style={s.unseenDot} />
+                  )}
+                </View>
+                <Text style={s.notificationItemBody} numberOfLines={2}>
+                  {notification.body}
+                </Text>
+                <Text style={s.notificationItemTime}>
+                  {formatNotificationTime(notification.date)}
+                </Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      </Animated.View>
+    );
+  };
+
   const currentBookings = getCurrentBookings();
 
   const dropdownScale = dropdownAnim.interpolate({
@@ -599,7 +759,7 @@ const Home = () => {
 
   return (
     <View style={s.container}>
-      {/* Header with User Profile */}
+      {/* Header with User Profile and Notifications */}
       <LinearGradient colors={['#6B5B95', '#7D6BA8']} style={s.stickyHeader}>
         <View style={s.headerContent}>
           <View style={s.headerTop}>
@@ -607,29 +767,55 @@ const Home = () => {
               <Text style={s.welcomeText}>Welcome Back</Text>
               <Text style={s.welcomeSubtext}>Manage your bookings efficiently</Text>
             </View>
-            <TouchableOpacity 
-              onPress={() => setShowUserDropdown(!showUserDropdown)} 
-              style={s.userProfileButton}
-              activeOpacity={0.8}
-            >
-              <View style={s.userAvatarContainer}>
-                {loadingUser ? (
-                  <ActivityIndicator size="small" color="#6B5B95" />
-                ) : (
-                  <Text style={s.userAvatarText}>
-                    {userData ? getInitials(userData.name || 'U') : 'U'}
-                  </Text>
+            
+            <View style={s.headerActions}>
+              {/* Notification Icon */}
+              <TouchableOpacity 
+                onPress={handleNotificationPress}
+                style={s.notificationButton}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+                {unseenCount > 0 && (
+                  <View style={s.notificationBadge}>
+                    <Text style={s.notificationBadgeText}>
+                      {unseenCount > 99 ? '99+' : unseenCount}
+                    </Text>
+                  </View>
                 )}
-              </View>
-              <Ionicons 
-                name={showUserDropdown ? "chevron-up" : "chevron-down"} 
-                size={16} 
-                color="#FFFFFF" 
-                style={s.dropdownIcon}
-              />
-            </TouchableOpacity>
+              </TouchableOpacity>
+
+              {/* User Profile Button */}
+              <TouchableOpacity 
+                onPress={() => {
+                  setShowUserDropdown(!showUserDropdown);
+                  setShowNotificationDropdown(false);
+                }} 
+                style={s.userProfileButton}
+                activeOpacity={0.8}
+              >
+                <View style={s.userAvatarContainer}>
+                  {loadingUser ? (
+                    <ActivityIndicator size="small" color="#6B5B95" />
+                  ) : (
+                    <Text style={s.userAvatarText}>
+                      {userData ? getInitials(userData.name || 'U') : 'U'}
+                    </Text>
+                  )}
+                </View>
+                <Ionicons 
+                  name={showUserDropdown ? "chevron-up" : "chevron-down"} 
+                  size={16} 
+                  color="#FFFFFF" 
+                  style={s.dropdownIcon}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
+
+        {/* Notification Dropdown */}
+        {showNotificationDropdown && renderNotificationDropdown()}
 
         {/* User Dropdown */}
         {showUserDropdown && userData && (
@@ -823,6 +1009,11 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   welcomeContainer: {
     flex: 1,
   },
@@ -836,6 +1027,31 @@ const s = StyleSheet.create({
     color: '#E9D5FF',
     fontSize: 15,
     fontWeight: '400',
+  },
+  notificationButton: {
+    position: 'relative',
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#6B5B95',
+  },
+  notificationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   userProfileButton: {
     flexDirection: 'row',
@@ -861,6 +1077,109 @@ const s = StyleSheet.create({
   },
   dropdownIcon: {
     marginLeft: 4,
+  },
+  notificationDropdown: {
+    position: 'absolute',
+    top: 100,
+    right: 20,
+    width: 350,
+    maxHeight: 400,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 1001,
+  },
+  notificationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  notificationTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  notificationActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  notificationActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    padding: 4,
+  },
+  notificationActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B5B95',
+  },
+  notificationList: {
+    maxHeight: 300,
+  },
+  noNotificationsContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noNotificationsText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginTop: 12,
+  },
+  noNotificationsSubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  notificationItem: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  unseenNotificationItem: {
+    backgroundColor: '#F0F4FF',
+  },
+  notificationItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  notificationItemTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    flex: 1,
+  },
+  unseenNotificationTitle: {
+    color: '#1F2937',
+    fontWeight: '700',
+  },
+  unseenDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#6B5B95',
+  },
+  notificationItemBody: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 4,
+    lineHeight: 18,
+  },
+  notificationItemTime: {
+    fontSize: 11,
+    color: '#9CA3AF',
   },
   userDropdown: {
     marginTop: 16,

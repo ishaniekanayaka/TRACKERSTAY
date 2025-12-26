@@ -1,22 +1,25 @@
-import React, { useState, useEffect, useRef } from "react";
+import api from "@/config/apiConfig";
+import { useAuth } from "@/context/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  StatusBar,
-  Animated,
-  Dimensions,
+  View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { useAuth } from "@/context/AuthContext";
-import { BlurView } from "expo-blur";
 
 const { width, height } = Dimensions.get("window");
 
@@ -218,13 +221,14 @@ const AnimatedParticle: React.FC<AnimatedParticleProps> = ({
 
 export default function Login() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, expoPushToken } = useAuth();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isVisible, setVisible] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [storedToken, setStoredToken] = useState<string | null>(null);
 
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(50)).current;
@@ -279,6 +283,48 @@ export default function Login() {
     }
   }, [error, errorSlide, errorOpacity]);
 
+  useEffect(() => {
+    const loadStoredToken = async () => {
+      const token = await AsyncStorage.getItem("@expo_push_token");
+      setStoredToken(token);
+    };
+    loadStoredToken();
+  }, []);
+
+  const saveDeviceToken = async () => {
+    const finalToken = storedToken || expoPushToken;
+
+    if (!finalToken) {
+      Alert.alert("No FCM Token", "Please ensure you have a valid FCM token first.");
+      return;
+    }
+
+    const url = "/user/device-token";
+    console.log("🚀 Saving device token:", url);
+
+    try {
+      const res = await api.post(
+        url,
+        {
+          device_token: finalToken,
+          device_type: Platform.OS === "ios" ? "ios" : "android",
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      console.log("✅ Backend response:", res.data);
+      Alert.alert("✅ Success", "Device token saved!");
+    } catch (err: any) {
+      console.error("❌ Failed to save device token:", err.response?.data || err.message);
+      Alert.alert("Error", "Failed to save device token — check console");
+    }
+  };
+
   const handleLogin = async (): Promise<void> => {
     if (!email.trim() || !password.trim()) {
       setError("Please enter both email and password");
@@ -301,6 +347,8 @@ export default function Login() {
       await login(email, password);
       
       console.log("✅ Login successful");
+      
+      await saveDeviceToken();
       
     } catch (error: any) {
       console.error("❌ Login error:", error.message);
@@ -665,4 +713,3 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
-

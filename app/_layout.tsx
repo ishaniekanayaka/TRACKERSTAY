@@ -1,36 +1,21 @@
-// import React from "react"
-// import './../global.css';
-// import { Slot, Stack } from "expo-router"
-// import { AuthProvider } from "@/context/AuthContext"
-// import { LoaderProvider } from "@/context/LoaderContext"
+import React from "react";
+import "./../global.css";
+import { Slot } from "expo-router";
+import { AuthProvider } from "@/context/AuthContext";
+import { LoaderProvider } from "@/context/LoaderContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 
-// const RootLayout = () => {
-//   return (
-//     <LoaderProvider>
-//       <AuthProvider>
-//         <Slot />
-//       </AuthProvider>
-//     </LoaderProvider>
-//   )
-// }
-
-// export default RootLayout
-
-
-import React from "react"
-import './../global.css';
-import { Slot, Stack } from "expo-router"
-import { AuthProvider } from "@/context/AuthContext"
-import { LoaderProvider } from "@/context/LoaderContext"
 
 const RootLayout = () => {
   return (
     <LoaderProvider>
       <AuthProvider>
-        <Slot />
+        <NotificationProvider>
+          <Slot />
+        </NotificationProvider>
       </AuthProvider>
     </LoaderProvider>
-  )
-}
+  );
+};
 
-export default RootLayout
+export default RootLayout;
