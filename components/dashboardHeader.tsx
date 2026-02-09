@@ -1,115 +1,511 @@
+// // components/DashboardHeader.tsx
+// import React, { useState, useRef, useEffect } from 'react';
+// import {
+//   StyleSheet,
+//   Text,
+//   View,
+//   TouchableOpacity,
+//   Animated,
+//   Modal,
+//   Dimensions,
+// } from 'react-native';
+// import { Ionicons } from '@expo/vector-icons';
+// import { LinearGradient } from 'expo-linear-gradient';
+// import { useRouter } from 'expo-router';
+
+// const { width } = Dimensions.get('window');
+
+// interface MenuItem {
+//   id: string;
+//   title: string;
+//   icon: keyof typeof Ionicons.glyphMap;
+//   route: string;
+// }
+
+// interface DashboardHeaderProps {
+//   title: string;
+//   subtitle: string;
+//   currentPage: string;
+// }
+
+// const DashboardHeader: React.FC<DashboardHeaderProps> = ({
+//   title,
+//   subtitle,
+//   currentPage,
+// }) => {
+//   const router = useRouter();
+//   const [menuVisible, setMenuVisible] = useState(false);
+//   const menuAnim = useRef(new Animated.Value(0)).current;
+//   const slideAnim = useRef(new Animated.Value(-300)).current;
+
+//   const menuItems: MenuItem[] = [
+//     {
+//       id: 'home',
+//       title: 'Home',
+//       icon: 'home',
+//       route: '/dashboard/home',
+//     },
+//     {
+//       id: 'utility',
+//       title: 'Utility',
+//       icon: 'flash',
+//       route: '/dashboard/utility',
+//     },
+//     {
+//       id: 'notification',
+//       title: 'Notifications',
+//       icon: 'notifications',
+//       route: '/dashboard/notification',
+//     },
+//   ];
+
+//   useEffect(() => {
+//     if (menuVisible) {
+//       Animated.parallel([
+//         Animated.timing(menuAnim, {
+//           toValue: 1,
+//           duration: 300,
+//           useNativeDriver: true,
+//         }),
+//         Animated.spring(slideAnim, {
+//           toValue: 0,
+//           useNativeDriver: true,
+//           tension: 50,
+//           friction: 8,
+//         }),
+//       ]).start();
+//     } else {
+//       Animated.parallel([
+//         Animated.timing(menuAnim, {
+//           toValue: 0,
+//           duration: 250,
+//           useNativeDriver: true,
+//         }),
+//         Animated.timing(slideAnim, {
+//           toValue: -300,
+//           duration: 250,
+//           useNativeDriver: true,
+//         }),
+//       ]).start();
+//     }
+//   }, [menuVisible]);
+
+//   const handleMenuItemPress = (route: string, itemId: string) => {
+//     if (itemId !== currentPage) {
+//       setMenuVisible(false);
+//       setTimeout(() => {
+//         router.push(route as any);
+//       }, 300);
+//     } else {
+//       setMenuVisible(false);
+//     }
+//   };
+
+//   return (
+//     <>
+//       <LinearGradient colors={['#6B5B95', '#7D6BA8']} style={styles.header}>
+//         <View style={styles.headerContent}>
+//           <View style={styles.headerTop}>
+//             <TouchableOpacity
+//               onPress={() => setMenuVisible(true)}
+//               style={styles.menuButton}
+//               activeOpacity={0.8}
+//             >
+//               <Ionicons name="menu" size={28} color="#FFFFFF" />
+//             </TouchableOpacity>
+
+//             <View style={styles.titleContainer}>
+//               <Text style={styles.headerTitle}>{title}</Text>
+//               <Text style={styles.headerSubtitle}>{subtitle}</Text>
+//             </View>
+//           </View>
+//         </View>
+//       </LinearGradient>
+
+//       {/* Side Menu Modal */}
+//       <Modal
+//         visible={menuVisible}
+//         transparent={true}
+//         animationType="none"
+//         onRequestClose={() => setMenuVisible(false)}
+//       >
+//         <View style={styles.modalOverlay}>
+//           <Animated.View
+//             style={[
+//               styles.modalBackground,
+//               {
+//                 opacity: menuAnim,
+//               },
+//             ]}
+//           >
+//             <TouchableOpacity
+//               style={styles.backgroundTouchable}
+//               activeOpacity={1}
+//               onPress={() => setMenuVisible(false)}
+//             />
+//           </Animated.View>
+
+//           <Animated.View
+//             style={[
+//               styles.menuContainer,
+//               {
+//                 transform: [{ translateX: slideAnim }],
+//               },
+//             ]}
+//           >
+//             <LinearGradient
+//               colors={['#6B5B95', '#7D6BA8']}
+//               style={styles.menuHeader}
+//             >
+//               <Text style={styles.menuHeaderTitle}>Navigation</Text>
+//               <TouchableOpacity
+//                 onPress={() => setMenuVisible(false)}
+//                 style={styles.closeButton}
+//               >
+//                 <Ionicons name="close" size={28} color="#FFFFFF" />
+//               </TouchableOpacity>
+//             </LinearGradient>
+
+//             <View style={styles.menuContent}>
+//               {menuItems.map((item, index) => {
+//                 const isActive = item.id === currentPage;
+//                 return (
+//                   <TouchableOpacity
+//                     key={item.id}
+//                     onPress={() => handleMenuItemPress(item.route, item.id)}
+//                     style={[
+//                       styles.menuItem,
+//                       isActive && styles.menuItemActive,
+//                     ]}
+//                     activeOpacity={0.7}
+//                   >
+//                     <View
+//                       style={[
+//                         styles.menuIconContainer,
+//                         isActive && styles.menuIconContainerActive,
+//                       ]}
+//                     >
+//                       <Ionicons
+//                         name={item.icon}
+//                         size={24}
+//                         color={isActive ? '#FFFFFF' : '#6B5B95'}
+//                       />
+//                     </View>
+//                     <Text
+//                       style={[
+//                         styles.menuItemText,
+//                         isActive && styles.menuItemTextActive,
+//                       ]}
+//                     >
+//                       {item.title}
+//                     </Text>
+//                     {isActive && (
+//                       <View style={styles.activeIndicator}>
+//                         <Ionicons
+//                           name="checkmark-circle"
+//                           size={20}
+//                           color="#10B981"
+//                         />
+//                       </View>
+//                     )}
+//                   </TouchableOpacity>
+//                 );
+//               })}
+//             </View>
+
+//             <View style={styles.menuFooter}>
+//               <View style={styles.menuFooterContent}>
+//                 <Ionicons name="information-circle" size={20} color="#6B7280" />
+//                 <Text style={styles.menuFooterText}>
+//                   Swipe right or tap outside to close
+//                 </Text>
+//               </View>
+//             </View>
+//           </Animated.View>
+//         </View>
+//       </Modal>
+//     </>
+//   );
+// };
+
+// const styles = StyleSheet.create({
+//   header: {
+//     paddingTop: 50,
+//     paddingBottom: 24,
+//     paddingHorizontal: 20,
+//     borderBottomLeftRadius: 30,
+//     borderBottomRightRadius: 30,
+//     shadowColor: '#000',
+//     shadowOffset: { width: 0, height: 4 },
+//     shadowOpacity: 0.15,
+//     shadowRadius: 8,
+//     elevation: 8,
+//   },
+//   headerContent: {
+//     gap: 16,
+//   },
+//   headerTop: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     gap: 16,
+//   },
+//   menuButton: {
+//     width: 44,
+//     height: 44,
+//     borderRadius: 22,
+//     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+//     justifyContent: 'center',
+//     alignItems: 'center',
+//   },
+//   titleContainer: {
+//     flex: 1,
+//   },
+//   headerTitle: {
+//     fontSize: 28,
+//     fontWeight: '700',
+//     color: '#FFFFFF',
+//     marginBottom: 4,
+//   },
+//   headerSubtitle: {
+//     fontSize: 14,
+//     color: '#E9D5FF',
+//   },
+//   modalOverlay: {
+//     flex: 1,
+//   },
+//   modalBackground: {
+//     ...StyleSheet.absoluteFillObject,
+//     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+//   },
+//   backgroundTouchable: {
+//     flex: 1,
+//   },
+//   menuContainer: {
+//     position: 'absolute',
+//     left: 0,
+//     top: 0,
+//     bottom: 0,
+//     width: width * 0.75,
+//     maxWidth: 300,
+//     backgroundColor: '#FFFFFF',
+//     shadowColor: '#000',
+//     shadowOffset: { width: 2, height: 0 },
+//     shadowOpacity: 0.25,
+//     shadowRadius: 12,
+//     elevation: 10,
+//   },
+//   menuHeader: {
+//     flexDirection: 'row',
+//     justifyContent: 'space-between',
+//     alignItems: 'center',
+//     paddingTop: 50,
+//     paddingBottom: 20,
+//     paddingHorizontal: 20,
+//   },
+//   menuHeaderTitle: {
+//     fontSize: 24,
+//     fontWeight: '700',
+//     color: '#FFFFFF',
+//   },
+//   closeButton: {
+//     width: 40,
+//     height: 40,
+//     borderRadius: 20,
+//     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+//     justifyContent: 'center',
+//     alignItems: 'center',
+//   },
+//   menuContent: {
+//     flex: 1,
+//     paddingTop: 20,
+//     paddingHorizontal: 16,
+//   },
+//   menuItem: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     paddingVertical: 16,
+//     paddingHorizontal: 16,
+//     borderRadius: 12,
+//     marginBottom: 8,
+//     backgroundColor: '#F9FAFB',
+//     gap: 16,
+//   },
+//   menuItemActive: {
+//     backgroundColor: '#6B5B95',
+//   },
+//   menuIconContainer: {
+//     width: 44,
+//     height: 44,
+//     borderRadius: 12,
+//     backgroundColor: '#F3F4F6',
+//     justifyContent: 'center',
+//     alignItems: 'center',
+//   },
+//   menuIconContainerActive: {
+//     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+//   },
+//   menuItemText: {
+//     flex: 1,
+//     fontSize: 16,
+//     fontWeight: '600',
+//     color: '#1F2937',
+//   },
+//   menuItemTextActive: {
+//     color: '#FFFFFF',
+//   },
+//   activeIndicator: {
+//     marginLeft: 'auto',
+//   },
+//   menuFooter: {
+//     borderTopWidth: 1,
+//     borderTopColor: '#E5E7EB',
+//     padding: 20,
+//   },
+//   menuFooterContent: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     gap: 8,
+//   },
+//   menuFooterText: {
+//     flex: 1,
+//     fontSize: 12,
+//     color: '#6B7280',
+//     fontStyle: 'italic',
+//   },
+// });
+
+// export default DashboardHeader;
+
+
 // components/DashboardHeader.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
-  Alert,
+  Text,
+  View,
+  TouchableOpacity,
   Animated,
-  ScrollView,
+  Modal,
   Dimensions,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { getCurrentUser } from '../services/authService';
-import { logout } from '../services/authService';
-import { useNotification } from '../context/NotificationContext';
-import { NotificationItem } from '../types/notification';
+import { logout, getCurrentUser } from '../services/authService';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const IS_MOBILE = SCREEN_WIDTH < 768;
+const { width } = Dimensions.get('window');
 
-interface UserData {
-  id: number;
-  name: string;
-  email: string;
-  lname: string;
-  status: string;
-  role: string;
-  hotel_chain_id: number;
-  hotel_id: number;
-  hotel: {
-    id: number;
-    hotel_name: string;
-    hotel_chain_id: number;
-  };
+interface MenuItem {
+  id: string;
+  title: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  route: string;
 }
 
 interface DashboardHeaderProps {
   title: string;
-  subtitle?: string;
-  onMenuPress?: () => void;
-  showMenuButton?: boolean;
+  subtitle: string;
+  currentPage: string;
 }
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   title,
-  subtitle = 'Manage your bookings efficiently',
-  onMenuPress,
-  showMenuButton = false,
+  subtitle,
+  currentPage,
 }) => {
   const router = useRouter();
-  const {
-    notifications,
-    unseenCount,
-    markAllAsSeen,
-    clearNotifications,
-    markAsSeen,
-  } = useNotification();
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [userData, setUserData] = useState<any>(null);
+  const [loadingUser, setLoadingUser] = useState(false);
+  
+  const menuAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(-300)).current;
 
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [loadingUser, setLoadingUser] = useState(true);
-
-  const dropdownAnim = useRef(new Animated.Value(0)).current;
-  const notificationDropdownAnim = useRef(new Animated.Value(0)).current;
+  const menuItems: MenuItem[] = [
+    {
+      id: 'home',
+      title: 'Home',
+      icon: 'home',
+      route: '/dashboard/home',
+    },
+    {
+      id: 'bookings',
+      title: 'Bookings',
+      icon: 'calendar',
+      route: '/dashboard/bookings',
+    },
+    {
+      id: 'utility',
+      title: 'Utility',
+      icon: 'flash',
+      route: '/dashboard/utility',
+    },
+    {
+      id: 'housekeeping',
+      title: 'Housekeeping',
+      icon: 'bed',
+      route: '/dashboard/housekeeping',
+    },
+    {
+      id: 'notification',
+      title: 'Notifications',
+      icon: 'notifications',
+      route: '/dashboard/notification',
+    },
+    {
+      id: 'settings',
+      title: 'Settings',
+      icon: 'settings',
+      route: '/dashboard/settings',
+    },
+    {
+      id: 'profile',
+      title: 'My Profile',
+      icon: 'person',
+      route: '/dashboard/profile',
+    },
+  ];
 
   useEffect(() => {
-    loadUserData();
-  }, []);
-
-  useEffect(() => {
-    Animated.timing(dropdownAnim, {
-      toValue: showUserDropdown ? 1 : 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  }, [showUserDropdown]);
-
-  useEffect(() => {
-    Animated.timing(notificationDropdownAnim, {
-      toValue: showNotificationDropdown ? 1 : 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  }, [showNotificationDropdown]);
+    if (menuVisible) {
+      loadUserData();
+      Animated.parallel([
+        Animated.timing(menuAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 8,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(menuAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: -300,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [menuVisible]);
 
   const loadUserData = async () => {
     try {
       setLoadingUser(true);
       const response = await getCurrentUser();
-      
       if (response && response.user) {
-        const user = response.user;
-        setUserData({
-          id: user.id,
-          name: user.name || 'User',
-          email: user.email || 'user@example.com',
-          lname: user.lname || '',
-          status: user.status || 'Active',
-          role: user.role || 'Admin',
-          hotel_chain_id: user.hotel_chain_id,
-          hotel_id: user.hotel_id,
-          hotel: {
-            id: user.hotel?.id || user.hotel_id,
-            hotel_name: user.hotel?.hotel_name || 'Hotel Name',
-            hotel_chain_id: user.hotel?.hotel_chain_id || user.hotel_chain_id,
-          },
-        });
+        setUserData(response.user);
       }
     } catch (error) {
       console.error('Error loading user:', error);
@@ -118,21 +514,36 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     }
   };
 
+  const handleMenuItemPress = (route: string, itemId: string) => {
+    if (itemId !== currentPage) {
+      setMenuVisible(false);
+      setTimeout(() => {
+        router.push(route as any);
+      }, 300);
+    } else {
+      setMenuVisible(false);
+    }
+  };
+
   const handleLogout = () => {
-    setShowUserDropdown(false);
     Alert.alert(
       'Logout',
       'Are you sure you want to logout?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
         {
           text: 'Logout',
           style: 'destructive',
           onPress: async () => {
             try {
               await logout();
+              setMenuVisible(false);
               router.replace('/login');
             } catch (error) {
+              console.error('Logout error:', error);
               Alert.alert('Error', 'Failed to logout');
             }
           },
@@ -141,279 +552,191 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     );
   };
 
-  const handleNotificationPress = () => {
-    setShowNotificationDropdown(!showNotificationDropdown);
-    setShowUserDropdown(false);
-  };
-
-  const handleMarkAllAsSeen = async () => {
-    await markAllAsSeen();
-  };
-
-  const handleClearNotifications = async () => {
-    Alert.alert(
-      'Clear Notifications',
-      'Are you sure you want to clear all notifications?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: async () => {
-            await clearNotifications();
-            setShowNotificationDropdown(false);
-          },
-        },
-      ]
-    );
-  };
-
-  const handleNotificationItemPress = async (notification: NotificationItem) => {
-    await markAsSeen(notification.id);
-    setShowNotificationDropdown(false);
-  };
-
-  const formatNotificationTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  };
-
-  const getInitials = (name: string): string => {
-    if (!name) return 'U';
+  const getInitials = (name: string = 'User') => {
     return name
       .split(' ')
-      .map((n) => n[0])
+      .map(n => n[0])
       .join('')
       .toUpperCase()
       .substring(0, 2);
   };
 
-  const dropdownScale = dropdownAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.9, 1],
-  });
-
-  const dropdownTranslateY = dropdownAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-10, 0],
-  });
-
-  const notificationScale = notificationDropdownAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.9, 1],
-  });
-
-  const notificationTranslateY = notificationDropdownAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-10, 0],
-  });
-
   return (
-    <LinearGradient colors={['#6B5B95', '#7D6BA8']} style={styles.header}>
-      <View style={styles.headerContent}>
-        <View style={styles.headerTop}>
-          <View style={styles.welcomeContainer}>
-            {showMenuButton && IS_MOBILE && (
-              <TouchableOpacity onPress={onMenuPress} style={styles.menuButton}>
-                <Ionicons name="menu" size={28} color="#FFFFFF" />
-              </TouchableOpacity>
-            )}
-            <View style={styles.textContainer}>
-              <Text style={styles.welcomeText}>{title}</Text>
-              {subtitle && <Text style={styles.welcomeSubtext}>{subtitle}</Text>}
+    <>
+      <LinearGradient colors={['#6B5B95', '#7D6BA8']} style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.headerTop}>
+            <TouchableOpacity
+              onPress={() => setMenuVisible(true)}
+              style={styles.menuButton}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="menu" size={28} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <View style={styles.titleContainer}>
+              <Text style={styles.headerTitle}>{title}</Text>
+              <Text style={styles.headerSubtitle}>{subtitle}</Text>
             </View>
-          </View>
-
-          <View style={styles.headerActions}>
-            {/* Notification Icon */}
-            <TouchableOpacity
-              onPress={handleNotificationPress}
-              style={styles.notificationButton}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
-              {unseenCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>
-                    {unseenCount > 99 ? '99+' : unseenCount}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            {/* User Profile Button */}
-            <TouchableOpacity
-              onPress={() => {
-                setShowUserDropdown(!showUserDropdown);
-                setShowNotificationDropdown(false);
-              }}
-              style={styles.userProfileButton}
-              activeOpacity={0.8}
-            >
-              <View style={styles.userAvatarContainer}>
-                {loadingUser ? (
-                  <ActivityIndicator size="small" color="#6B5B95" />
-                ) : (
-                  <Text style={styles.userAvatarText}>
-                    {userData ? getInitials(userData.name || 'U') : 'U'}
-                  </Text>
-                )}
-              </View>
-              <Ionicons
-                name={showUserDropdown ? 'chevron-up' : 'chevron-down'}
-                size={16}
-                color="#FFFFFF"
-                style={styles.dropdownIcon}
-              />
-            </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </LinearGradient>
 
-      {/* Notification Dropdown */}
-      {showNotificationDropdown && (
-        <Animated.View
-          style={[
-            styles.notificationDropdown,
-            {
-              opacity: notificationDropdownAnim,
-              transform: [
-                { scale: notificationScale },
-                { translateY: notificationTranslateY },
-              ],
-            },
-          ]}
-        >
-          <View style={styles.notificationHeader}>
-            <Text style={styles.notificationTitle}>Notifications</Text>
-            <View style={styles.notificationActions}>
-              {unseenCount > 0 && (
-                <TouchableOpacity
-                  onPress={handleMarkAllAsSeen}
-                  style={styles.notificationActionButton}
-                >
-                  <Ionicons name="checkmark-done-outline" size={18} color="#6B5B95" />
-                  <Text style={styles.notificationActionText}>Mark all read</Text>
-                </TouchableOpacity>
-              )}
-              {notifications.length > 0 && (
-                <TouchableOpacity
-                  onPress={handleClearNotifications}
-                  style={styles.notificationActionButton}
-                >
-                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                  <Text style={[styles.notificationActionText, { color: '#EF4444' }]}>
-                    Clear all
-                  </Text>
-                </TouchableOpacity>
+      {/* Side Menu Modal */}
+      <Modal
+        visible={menuVisible}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View
+            style={[
+              styles.modalBackground,
+              {
+                opacity: menuAnim,
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.backgroundTouchable}
+              activeOpacity={1}
+              onPress={() => setMenuVisible(false)}
+            />
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              styles.menuContainer,
+              {
+                transform: [{ translateX: slideAnim }],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={['#6B5B95', '#7D6BA8']}
+              style={styles.menuHeader}
+            >
+              <Text style={styles.menuHeaderTitle}>Navigation Menu</Text>
+              <TouchableOpacity
+                onPress={() => setMenuVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={28} color="#FFFFFF" />
+              </TouchableOpacity>
+            </LinearGradient>
+
+            {/* User Info Section */}
+            <View style={styles.userInfoSection}>
+              {loadingUser ? (
+                <ActivityIndicator size="large" color="#6B5B95" />
+              ) : userData ? (
+                <>
+                  <View style={styles.userAvatar}>
+                    <Text style={styles.userAvatarText}>
+                      {getInitials(userData.name)}
+                    </Text>
+                  </View>
+                  <View style={styles.userDetails}>
+                    <Text style={styles.userName}>
+                      {userData.name} {userData.lname}
+                    </Text>
+                    <Text style={styles.userEmail}>{userData.email}</Text>
+                    {userData.hotel?.hotel_name && (
+                      <Text style={styles.userHotel}>
+                        {userData.hotel.hotel_name}
+                      </Text>
+                    )}
+                  </View>
+                </>
+              ) : (
+                <View style={styles.userPlaceholder}>
+                  <Ionicons name="person-circle" size={60} color="#6B5B95" />
+                  <Text style={styles.userPlaceholderText}>User Profile</Text>
+                </View>
               )}
             </View>
-          </View>
 
-          <ScrollView style={styles.notificationList} showsVerticalScrollIndicator={false}>
-            {notifications.length === 0 ? (
-              <View style={styles.noNotificationsContainer}>
-                <Ionicons name="notifications-off-outline" size={48} color="#9CA3AF" />
-                <Text style={styles.noNotificationsText}>No notifications</Text>
-                <Text style={styles.noNotificationsSubtext}>You're all caught up!</Text>
-              </View>
-            ) : (
-              notifications.map((notification) => (
-                <TouchableOpacity
-                  key={notification.id}
-                  onPress={() => handleNotificationItemPress(notification)}
-                  style={[
-                    styles.notificationItem,
-                    !notification.seen && styles.unseenNotificationItem,
-                  ]}
-                >
-                  <View style={styles.notificationItemHeader}>
-                    <Text
+            {/* Menu Items */}
+            <View style={styles.menuContent}>
+              {menuItems.map((item) => {
+                const isActive = item.id === currentPage;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    onPress={() => handleMenuItemPress(item.route, item.id)}
+                    style={[
+                      styles.menuItem,
+                      isActive && styles.menuItemActive,
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    <View
                       style={[
-                        styles.notificationItemTitle,
-                        !notification.seen && styles.unseenNotificationTitle,
+                        styles.menuIconContainer,
+                        isActive && styles.menuIconContainerActive,
                       ]}
                     >
-                      {notification.title}
+                      <Ionicons
+                        name={item.icon}
+                        size={22}
+                        color={isActive ? '#FFFFFF' : '#6B5B95'}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.menuItemText,
+                        isActive && styles.menuItemTextActive,
+                      ]}
+                    >
+                      {item.title}
                     </Text>
-                    {!notification.seen && <View style={styles.unseenDot} />}
-                  </View>
-                  <Text style={styles.notificationItemBody} numberOfLines={2}>
-                    {notification.body}
-                  </Text>
-                  <Text style={styles.notificationItemTime}>
-                    {formatNotificationTime(notification.date)}
-                  </Text>
-                </TouchableOpacity>
-              ))
-            )}
-          </ScrollView>
-        </Animated.View>
-      )}
-
-      {/* User Dropdown */}
-      {showUserDropdown && userData && (
-        <Animated.View
-          style={[
-            styles.userDropdown,
-            {
-              opacity: dropdownAnim,
-              transform: [{ scale: dropdownScale }, { translateY: dropdownTranslateY }],
-            },
-          ]}
-        >
-          <View style={styles.dropdownHeader}>
-            <View style={styles.dropdownAvatarLarge}>
-              <Text style={styles.dropdownAvatarText}>
-                {getInitials(userData.name || 'U')}
-              </Text>
+                    {isActive && (
+                      <View style={styles.activeIndicator}>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={16}
+                          color="#FFFFFF"
+                        />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-            <View style={styles.dropdownUserInfo}>
-              <Text style={styles.dropdownUserName}>
-                {userData.name} {userData.lname}
-              </Text>
-              <Text style={styles.dropdownHotelName}>{userData.hotel.hotel_name}</Text>
+
+            {/* Logout Button */}
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={handleLogout}
+              activeOpacity={0.7}
+            >
+              <View style={styles.logoutIconContainer}>
+                <Ionicons name="log-out-outline" size={22} color="#EF4444" />
+              </View>
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+
+            <View style={styles.menuFooter}>
+              <View style={styles.menuFooterContent}>
+                <Ionicons name="information-circle" size={16} color="#6B7280" />
+                <Text style={styles.menuFooterText}>
+                  Swipe right or tap outside to close
+                </Text>
+              </View>
             </View>
-          </View>
-
-          <View style={styles.dropdownDivider} />
-
-          <View style={styles.dropdownItem}>
-            <Ionicons name="mail-outline" size={18} color="#6B5B95" />
-            <Text style={styles.dropdownItemText}>{userData.email}</Text>
-          </View>
-
-          <View style={styles.dropdownDivider} />
-
-          <TouchableOpacity
-            onPress={handleLogout}
-            style={styles.dropdownLogoutButton}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-            <Text style={styles.dropdownLogoutText}>Logout</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-    </LinearGradient>
+          </Animated.View>
+        </View>
+      </Modal>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingTop: 50,
     paddingBottom: 24,
+    paddingHorizontal: 20,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     shadowColor: '#000',
@@ -421,274 +744,224 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 8,
-    zIndex: 1000,
   },
   headerContent: {
     gap: 16,
   },
   headerTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  welcomeContainer: {
-    flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
   menuButton: {
-    padding: 4,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  textContainer: {
+  titleContainer: {
     flex: 1,
   },
-  welcomeText: {
-    color: '#FFFFFF',
-    fontSize: 32,
+  headerTitle: {
+    fontSize: 28,
     fontWeight: '700',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
-  welcomeSubtext: {
+  headerSubtitle: {
+    fontSize: 14,
     color: '#E9D5FF',
-    fontSize: 15,
-    fontWeight: '400',
   },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  modalOverlay: {
+    flex: 1,
   },
-  notificationButton: {
-    position: 'relative',
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  modalBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  notificationBadge: {
+  backgroundTouchable: {
+    flex: 1,
+  },
+  menuContainer: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#6B5B95',
-  },
-  notificationBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  userProfileButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 8,
-  },
-  userAvatarContainer: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: width * 0.8,
+    maxWidth: 320,
     backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  userAvatarText: {
-    color: '#6B5B95',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  dropdownIcon: {
-    marginLeft: 4,
-  },
-  notificationDropdown: {
-    position: 'absolute',
-    top: 100,
-    right: 20,
-    width: 350,
-    maxHeight: 400,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.25,
     shadowRadius: 12,
-    elevation: 8,
-    zIndex: 1001,
+    elevation: 10,
   },
-  notificationHeader: {
+  menuHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  menuHeaderTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userInfoSection: {
+    padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
-  },
-  notificationTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  notificationActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
-  notificationActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    padding: 4,
-  },
-  notificationActionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B5B95',
-  },
-  notificationList: {
-    maxHeight: 300,
-  },
-  noNotificationsContainer: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  noNotificationsText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginTop: 12,
-  },
-  noNotificationsSubtext: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    marginTop: 4,
-  },
-  notificationItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  unseenNotificationItem: {
-    backgroundColor: '#F0F4FF',
-  },
-  notificationItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  notificationItemTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-    flex: 1,
-  },
-  unseenNotificationTitle: {
-    color: '#1F2937',
-    fontWeight: '700',
-  },
-  unseenDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  userAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#6B5B95',
-  },
-  notificationItemBody: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginBottom: 4,
-    lineHeight: 18,
-  },
-  notificationItemTime: {
-    fontSize: 11,
-    color: '#9CA3AF',
-  },
-  userDropdown: {
-    marginTop: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  dropdownHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 12,
-  },
-  dropdownAvatarLarge: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#6B5B95',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dropdownAvatarText: {
+  userAvatarText: {
     color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '700',
   },
-  dropdownUserInfo: {
+  userDetails: {
     flex: 1,
   },
-  dropdownUserName: {
-    color: '#1F2937',
-    fontSize: 17,
+  userName: {
+    fontSize: 16,
     fontWeight: '700',
+    color: '#1F2937',
     marginBottom: 2,
   },
-  dropdownHotelName: {
+  userEmail: {
+    fontSize: 13,
     color: '#6B7280',
-    fontSize: 14,
-    fontWeight: '500',
+    marginBottom: 4,
   },
-  dropdownDivider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: 12,
+  userHotel: {
+    fontSize: 12,
+    color: '#6B5B95',
+    fontWeight: '600',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
   },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 8,
-  },
-  dropdownItemText: {
-    color: '#374151',
-    fontSize: 14,
-    fontWeight: '500',
+  userPlaceholder: {
     flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
   },
-  dropdownLogoutButton: {
+  userPlaceholderText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  menuContent: {
+    flex: 1,
+    paddingTop: 16,
+    paddingHorizontal: 12,
+  },
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: '#FEF2F2',
-    paddingVertical: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: '#F9FAFB',
+    gap: 14,
+  },
+  menuItemActive: {
+    backgroundColor: '#6B5B95',
+  },
+  menuIconContainer: {
+    width: 40,
+    height: 40,
     borderRadius: 10,
-    marginTop: 8,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuIconContainerActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  menuItemText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  menuItemTextActive: {
+    color: '#FFFFFF',
+  },
+  activeIndicator: {
+    marginLeft: 'auto',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginVertical: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FEE2E2',
+    gap: 14,
   },
-  dropdownLogoutText: {
-    color: '#EF4444',
-    fontSize: 15,
+  logoutIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoutText: {
+    flex: 1,
+    fontSize: 16,
     fontWeight: '700',
+    color: '#EF4444',
+  },
+  menuFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  menuFooterContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  menuFooterText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#6B7280',
+    fontStyle: 'italic',
   },
 });
 

@@ -30,6 +30,7 @@ import utilityService, {
   TotalCount,
   TotalBillCount,
 } from '../../services/utilityService';
+import DashboardHeader from '@/components/HeaderWithMenu';
 
 const { width } = Dimensions.get('window');
 
@@ -50,7 +51,7 @@ const Utility = () => {
   // View toggle state
   const [viewMode, setViewMode] = useState<'list' | 'summary'>('list');
 
-  // Summary view state - UPDATED
+  // Summary view state
   const [chartData, setChartData] = useState<CategoryChartData[]>([]);
   const [totalCounts, setTotalCounts] = useState<TotalCount[]>([]);
   const [totalBillCounts, setTotalBillCounts] = useState<TotalBillCount[]>([]);
@@ -159,7 +160,6 @@ const Utility = () => {
     }
   };
 
-  // UPDATED: Chart data loading function
   const loadChartData = async () => {
     try {
       setLoading(true);
@@ -176,7 +176,6 @@ const Utility = () => {
     }
   };
 
-  // UPDATED: Get category data helper
   const getCategoryData = (categoryName: string) => {
     const totalCount = totalCounts.find(tc => tc.category === categoryName);
     const billCount = totalBillCounts.find(bc => bc.category === categoryName);
@@ -189,10 +188,10 @@ const Utility = () => {
     };
   };
 
-  // UPDATED: Build chart data
   const buildChart = (category: CategoryChartData) => {
-    const labels = category.readings.map(r => dayjs(r.date).format('D'));
-
+    // දින ලේබල් පළල වැඩි කිරීම
+    const labels = category.readings.map(r => dayjs(r.date).format('DD MMM'));
+    
     const utilityValues = category.readings.map(
       r => (r[category.categoryDisplayName] as number) ?? 0
     );
@@ -344,96 +343,112 @@ const Utility = () => {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!formData.startreading.trim()) {
-      Alert.alert('Error', 'Please enter meter reading');
+  // app/dashboard/utility.tsx
+// පළමුව, handleSubmit function එකේ තියෙන code එක replace කරන්න:
+
+const handleSubmit = async () => {
+  if (!formData.startreading.trim()) {
+    Alert.alert('Error', 'Please enter meter reading');
+    return;
+  }
+
+  if (!isEditMode && !formData.utility_image) {
+    Alert.alert('Error', 'Please select an image');
+    return;
+  }
+
+  if (formData.u_category === 0) {
+    Alert.alert('Error', 'Please select a category');
+    return;
+  }
+
+  // Check for duplicate entry only for new entries (not for updates)
+  if (!isEditMode) {
+    const isDuplicate = checkDuplicateEntry(formData.date, formData.u_category);
+    if (isDuplicate) {
+      const categoryName = categories.find(c => c.id === formData.u_category)?.utility_category_name || 'this category';
+      const dateStr = formData.date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+      
+      Alert.alert(
+        'Duplicate Entry',
+        `A utility reading for ${categoryName} on ${dateStr} already exists. Please choose a different date or category.`,
+        [{ text: 'OK' }]
+      );
       return;
     }
+  }
 
-    if (!isEditMode && !formData.utility_image) {
-      Alert.alert('Error', 'Please select an image');
-      return;
+  try {
+    setSubmitting(true);
+    
+    const formDataToSend = new FormData();
+    
+    // Edit mode නම් id එක add කරන්න
+    if (isEditMode && editingId) {
+      formDataToSend.append('id', editingId.toString());
+    }
+    
+    formDataToSend.append('date', formData.date.toISOString().split('T')[0]);
+    formDataToSend.append('u_category', formData.u_category.toString());
+    formDataToSend.append('startreading', formData.startreading);
+    
+    if (formData.utility_image) {
+      const filename = formData.utility_image.split('/').pop() || 'utility_image.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      formDataToSend.append('utility_image', {
+        uri: formData.utility_image,
+        name: filename,
+        type: type,
+      } as any);
+    } else if (isEditMode && existingImage) {
+      // Edit mode එකේදි නව රූපයක් select නොකළොත්, existing image එක keep කරන්න
+      formDataToSend.append('existing_image', existingImage);
     }
 
-    if (formData.u_category === 0) {
-      Alert.alert('Error', 'Please select a category');
-      return;
+    let response;
+    
+    // Edit mode නම් updateUtility function එක use කරන්න
+    if (isEditMode && editingId) {
+      response = await utilityService.updateUtility(editingId, formDataToSend as any);
+    } else {
+      // New entry නම් saveUtility function එක use කරන්න
+      response = await utilityService.saveUtility(formDataToSend as any);
     }
-
-    if (!isEditMode) {
-      const isDuplicate = checkDuplicateEntry(formData.date, formData.u_category);
-      if (isDuplicate) {
-        const categoryName = categories.find(c => c.id === formData.u_category)?.utility_category_name || 'this category';
-        const dateStr = formData.date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        });
-        
-        Alert.alert(
-          'Duplicate Entry',
-          `A utility reading for ${categoryName} on ${dateStr} already exists. Please choose a different date or category.`,
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-    }
-
-    try {
-      setSubmitting(true);
-      
-      const formDataToSend = new FormData();
-      
-      if (isEditMode && editingId) {
-        formDataToSend.append('id', editingId.toString());
-      }
-      
-      formDataToSend.append('date', formData.date.toISOString().split('T')[0]);
-      formDataToSend.append('u_category', formData.u_category.toString());
-      formDataToSend.append('startreading', formData.startreading);
-      
-      if (formData.utility_image) {
-        const filename = formData.utility_image.split('/').pop() || 'utility_image.jpg';
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
-        
-        formDataToSend.append('utility_image', {
-          uri: formData.utility_image,
-          name: filename,
-          type: type,
-        } as any);
-      }
-
-      await utilityService.saveUtility(formDataToSend as any);
-      
-      setModalVisible(false);
-      
-      setTimeout(() => {
-        Alert.alert(
-          'Success', 
-          isEditMode ? 'Utility record updated successfully' : 'Utility record added successfully',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                resetForm();
-                loadData();
-                if (viewMode === 'summary') {
-                  loadChartData();
-                }
+    
+    setModalVisible(false);
+    
+    setTimeout(() => {
+      Alert.alert(
+        'Success', 
+        isEditMode ? 'Utility record updated successfully' : 'Utility record added successfully',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              resetForm();
+              loadData();
+              if (viewMode === 'summary') {
+                loadChartData();
               }
             }
-          ]
-        );
-      }, 300);
-      
-    } catch (error: any) {
-      console.error('Error saving utility:', error);
-      Alert.alert('Error', error.message || 'Failed to save utility record');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+          }
+        ]
+      );
+    }, 300);
+    
+  } catch (error: any) {
+    console.error('Error saving utility:', error);
+    Alert.alert('Error', error.message || 'Failed to save utility record');
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const resetForm = useCallback(() => {
     setFormData({
@@ -504,7 +519,7 @@ const Utility = () => {
     if (imagePath.startsWith('http') || imagePath.startsWith('data:')) {
       return imagePath;
     }
-    return `https://demo.trackerstay.com/storage/${imagePath}`;
+    return `https://app.trackerstay.com/storage/${imagePath}`;
   };
 
   const renderUtilityCard = useCallback(({ item }: { item: UtilityItem }) => {
@@ -587,38 +602,35 @@ const Utility = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <LinearGradient colors={['#6B5B95', '#7D6BA8']} style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Utility Management</Text>
-          <Text style={styles.headerSubtitle}>
-            {viewMode === 'list' ? 'Track and manage utility readings' : `${formatMonthYear(selectedDate)} - Dashboard`}
+      {/* Header with DashboardHeader component */}
+      <DashboardHeader 
+        title="Utility Management"
+        subtitle={viewMode === 'list' ? 'Track and manage utility readings' : `${formatMonthYear(selectedDate)} - Dashboard`}
+        currentPage="utility"
+      />
+      
+      {/* View Toggle Buttons */}
+      <View style={styles.viewToggleContainer}>
+        <TouchableOpacity
+          style={[styles.toggleButton, viewMode === 'list' && styles.toggleButtonActive]}
+          onPress={() => setViewMode('list')}
+        >
+          <Ionicons name="list" size={20} color={viewMode === 'list' ? '#FFFFFF' : '#6B5B95'} />
+          <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>
+            List View
           </Text>
-        </View>
+        </TouchableOpacity>
         
-        {/* View Toggle Buttons */}
-        <View style={styles.viewToggle}>
-          <TouchableOpacity
-            style={[styles.toggleButton, viewMode === 'list' && styles.toggleButtonActive]}
-            onPress={() => setViewMode('list')}
-          >
-            <Ionicons name="list" size={20} color={viewMode === 'list' ? '#FFFFFF' : '#6B5B95'} />
-            <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>
-              List View
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.toggleButton, viewMode === 'summary' && styles.toggleButtonActive]}
-            onPress={() => setViewMode('summary')}
-          >
-            <Ionicons name="bar-chart" size={20} color={viewMode === 'summary' ? '#FFFFFF' : '#6B5B95'} />
-            <Text style={[styles.toggleText, viewMode === 'summary' && styles.toggleTextActive]}>
-              Summary
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+        <TouchableOpacity
+          style={[styles.toggleButton, viewMode === 'summary' && styles.toggleButtonActive]}
+          onPress={() => setViewMode('summary')}
+        >
+          <Ionicons name="bar-chart" size={20} color={viewMode === 'summary' ? '#FFFFFF' : '#6B5B95'} />
+          <Text style={[styles.toggleText, viewMode === 'summary' && styles.toggleTextActive]}>
+            Summary
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {viewMode === 'list' ? (
         <>
@@ -763,7 +775,7 @@ const Utility = () => {
           />
         </>
       ) : (
-        /* UPDATED SUMMARY VIEW */
+        /* SUMMARY VIEW */
         <ScrollView 
           style={styles.summaryContent}
           contentContainerStyle={styles.summaryScrollContent}
@@ -840,43 +852,57 @@ const Utility = () => {
                   </Text>
                 </View>
 
-                {/* Chart */}
-                <View style={styles.chartContainer}>
-                  <LineChart
-                    data={buildChart(category)}
-                    width={width - 64}
-                    height={280}
-                    withDots
-                    withShadow={false}
-                    withInnerLines
-                    withOuterLines
-                    withVerticalLines
-                    withHorizontalLines
-                    bezier
-                    chartConfig={{
-                      backgroundColor: '#ffffff',
-                      backgroundGradientFrom: '#ffffff',
-                      backgroundGradientTo: '#ffffff',
-                      decimalPlaces: 0,
-                      color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                      labelColor: (opacity = 1) => `rgba(71, 85, 105, ${opacity})`,
-                      style: {
-                        borderRadius: 16,
-                      },
-                      propsForDots: {
-                        r: '5',
-                        strokeWidth: '2',
-                        stroke: '#ffffff',
-                      },
-                      propsForBackgroundLines: {
-                        strokeDasharray: '',
-                        stroke: '#E2E8F0',
-                        strokeWidth: 1,
-                      },
-                    }}
-                    style={styles.chart}
-                  />
-                </View>
+                {/* Scrollable Chart Container */}
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={true}
+                  style={styles.chartScrollContainer}
+                >
+                  <View style={styles.chartInnerContainer}>
+                    <LineChart
+                      data={buildChart(category)}
+                      // දිගටි chart එකක් සඳහා width වැඩි කරන්න
+                      width={Math.max(width - 64, category.readings.length * 50)}
+                      height={280}
+                      withDots
+                      withShadow={false}
+                      withInnerLines
+                      withOuterLines
+                      withVerticalLines
+                      withHorizontalLines
+                      bezier
+                      chartConfig={{
+                        backgroundColor: '#ffffff',
+                        backgroundGradientFrom: '#ffffff',
+                        backgroundGradientTo: '#ffffff',
+                        decimalPlaces: 0,
+                        color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                        labelColor: (opacity = 1) => `rgba(71, 85, 105, ${opacity})`,
+                        style: {
+                          borderRadius: 16,
+                        },
+                        propsForDots: {
+                          r: '5',
+                          strokeWidth: '2',
+                          stroke: '#ffffff',
+                        },
+                        propsForBackgroundLines: {
+                          strokeDasharray: '',
+                          stroke: '#E2E8F0',
+                          strokeWidth: 1,
+                        },
+                        // දිගටි x-axis labels සඳහා
+                        propsForLabels: {
+                          fontSize: 10,
+                          rotation: 45, // දිගටි දින labels කැරකෙනු ඇත
+                          dx: 10,
+                        },
+                      }}
+                      // දිගටි chart සඳහා style
+                      style={[styles.chart, { marginLeft: 16 }]}
+                    />
+                  </View>
+                </ScrollView>
 
                 {/* Legend */}
                 <View style={styles.legendContainer}>
@@ -1231,57 +1257,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
   },
-  header: {
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  headerContent: {
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#E9D5FF',
-  },
-  viewToggle: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  viewToggleContainer: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
     borderRadius: 12,
     padding: 4,
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   toggleButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 8,
     gap: 6,
   },
   toggleButtonActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#6B5B95',
   },
   toggleText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#6B5B95',
   },
   toggleTextActive: {
-    color: '#6B5B95',
+    color: '#FFFFFF',
   },
   summaryContent: {
     flex: 1,
@@ -1368,10 +1376,17 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontWeight: '500',
   },
-  chartContainer: {
+  // NEW: Scrollable chart container
+  chartScrollContainer: {
     marginTop: 16,
     marginBottom: 12,
-    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  chartInnerContainer: {
+    padding: 8,
   },
   chart: {
     marginVertical: 8,
@@ -1746,6 +1761,7 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 24,
   },
+
   resetButton: {
     flex: 1,
     paddingVertical: 14,
@@ -1845,3 +1861,4 @@ const styles = StyleSheet.create({
 });
 
 export default Utility;
+

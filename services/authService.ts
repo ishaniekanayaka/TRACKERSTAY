@@ -1,3 +1,4 @@
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../config/apiConfig";
 
@@ -69,6 +70,28 @@ export const getCurrentUser = async (): Promise<any> => {
     return data;
   } catch (error) {
     console.error("Failed to fetch current user:", error);
+    return null;
+  }
+};
+
+// CHECK IF USER IS LOGGED IN
+export const isLoggedIn = async (): Promise<boolean> => {
+  try {
+    const userData = await AsyncStorage.getItem("@user_data");
+    return userData !== null;
+  } catch (error) {
+    console.error("Error checking login status:", error);
+    return false;
+  }
+};
+
+// GET STORED USER DATA
+export const getStoredUserData = async (): Promise<LoginResponse | null> => {
+  try {
+    const userData = await AsyncStorage.getItem("@user_data");
+    return userData ? JSON.parse(userData) : null;
+  } catch (error) {
+    console.error("Error getting stored user data:", error);
     return null;
   }
 };

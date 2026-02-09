@@ -20,6 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Colors from "@/components/colors";
 
 const { width, height } = Dimensions.get("window");
 
@@ -41,7 +42,6 @@ const AnimatedCircle: React.FC<AnimatedCircleProps> = ({
   const scale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Floating animation
     Animated.loop(
       Animated.sequence([
         Animated.delay(delay),
@@ -58,7 +58,6 @@ const AnimatedCircle: React.FC<AnimatedCircleProps> = ({
       ])
     ).start();
 
-    // Rotation animation
     Animated.loop(
       Animated.timing(rotate, {
         toValue: 1,
@@ -67,7 +66,6 @@ const AnimatedCircle: React.FC<AnimatedCircleProps> = ({
       })
     ).start();
 
-    // Pulse animation
     Animated.loop(
       Animated.sequence([
         Animated.timing(scale, {
@@ -292,38 +290,83 @@ export default function Login() {
   }, []);
 
   const saveDeviceToken = async () => {
-    const finalToken = storedToken || expoPushToken;
+  const finalToken = storedToken || expoPushToken;
 
-    if (!finalToken) {
-      Alert.alert("No FCM Token", "Please ensure you have a valid FCM token first.");
-      return;
-    }
+  // 🔍 DEBUG LOGS
+  console.log("📦 storedToken:", storedToken);
+  console.log("📲 expoPushToken:", expoPushToken);
+  console.log("🎯 finalToken:", finalToken);
 
-    const url = "/user/device-token";
-    console.log("🚀 Saving device token:", url);
+  if (!finalToken) {
+    console.warn("❌ No device token available");
+    Alert.alert(
+      "No FCM Token",
+      "Please ensure you have a valid FCM token first."
+    );
+    return;
+  }
 
-    try {
-      const res = await api.post(
-        url,
-        {
-          device_token: finalToken,
-          device_type: Platform.OS === "ios" ? "ios" : "android",
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-        }
-      );
-
-      console.log("✅ Backend response:", res.data);
-      Alert.alert("✅ Success", "Device token saved!");
-    } catch (err: any) {
-      console.error("❌ Failed to save device token:", err.response?.data || err.message);
-      Alert.alert("Error", "Failed to save device token — check console");
-    }
+  const payload = {
+    device_token: finalToken,
+    device_type: Platform.OS === "ios" ? "ios" : "android",
+    app_type: "BOOKING",
   };
+
+  console.log("🚀 Sending payload to backend:", payload);
+
+  try {
+    const res = await api.post("/user/device-token", payload, {
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    });
+
+    console.log("✅ Backend response:", res.data);
+    Alert.alert("✅ Success", "Device token saved!");
+  } catch (err: any) {
+    console.error(
+      "❌ Failed to save device token:",
+      err.response?.data || err.message
+    );
+    Alert.alert("Error", "Failed to save device token — check console");
+  }
+};
+
+  // const saveDeviceToken = async () => {
+  //   const finalToken = storedToken || expoPushToken;
+
+  //   if (!finalToken) {
+  //     Alert.alert("No FCM Token", "Please ensure you have a valid FCM token first.");
+  //     return;
+  //   }
+
+  //   const url = "/user/device-token";
+  //   console.log("🚀 Saving device token:", url);
+
+  //   try {
+  //     const res = await api.post(
+  //       url,
+  //       {
+  //         device_token: finalToken,
+  //         device_type: Platform.OS === "ios" ? "ios" : "android",
+  //         app_type: "BOOKING",
+  //       },
+  //       {
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //           Accept: "application/json",
+  //         },
+  //       }
+  //     );
+
+  //     console.log("✅ Backend response:", res.data);
+  //     Alert.alert("✅ Success", "Device token saved!");
+  //   } catch (err: any) {
+  //     console.error("❌ Failed to save device token:", err.response?.data || err.message);
+  //     Alert.alert("Error", "Failed to save device token — check console");
+  //   }
+  // };
 
   const handleLogin = async (): Promise<void> => {
     if (!email.trim() || !password.trim()) {
@@ -361,9 +404,12 @@ export default function Login() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#8B7FA8" />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.primary.main} />
       
-      <LinearGradient colors={["#8B7FA8", "#9D8FB8", "#A89DC4"]} style={styles.gradient}>
+      <LinearGradient 
+        colors={[Colors.primary.main, Colors.primary.light, Colors.primary.lighter] as const}
+        style={styles.gradient}
+      >
         <ParticleBackground />
         <AnimatedCircle delay={0} size={250} initialX={-50} initialY={50} />
         <AnimatedCircle delay={800} size={180} initialX={width - 150} initialY={250} />
@@ -385,7 +431,7 @@ export default function Login() {
         >
           <View style={styles.headerContainer}>
             <View style={styles.logoCircle}>
-              <Ionicons name="finger-print" size={40} color="#8B7FA8" />
+              <Ionicons name="finger-print" size={40} color={Colors.primary.main} />
             </View>
             <Text style={styles.title}>Welcome Back</Text>
             <Text style={styles.subtitle}>Sign in to continue your journey</Text>
@@ -394,12 +440,12 @@ export default function Login() {
           <View style={styles.inputContainer}>
             <View style={styles.inputBox}>
               <View style={styles.iconContainer}>
-                <Ionicons name="mail-outline" size={22} color="#8B7FA8" />
+                <Ionicons name="mail-outline" size={22} color={Colors.primary.main} />
               </View>
               <TextInput
                 style={styles.input}
                 placeholder="Email address"
-                placeholderTextColor="#999"
+                placeholderTextColor={Colors.text.light}
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
@@ -414,12 +460,12 @@ export default function Login() {
 
             <View style={styles.inputBox}>
               <View style={styles.iconContainer}>
-                <Ionicons name="lock-closed-outline" size={22} color="#8B7FA8" />
+                <Ionicons name="lock-closed-outline" size={22} color={Colors.primary.main} />
               </View>
               <TextInput
                 style={styles.input}
                 placeholder="Password"
-                placeholderTextColor="#999"
+                placeholderTextColor={Colors.text.light}
                 secureTextEntry={!isVisible}
                 value={password}
                 onChangeText={(text) => {
@@ -439,7 +485,7 @@ export default function Login() {
                 <Ionicons 
                   name={isVisible ? "eye-outline" : "eye-off-outline"} 
                   size={22} 
-                  color="#666" 
+                  color={Colors.text.tertiary} 
                 />
               </TouchableOpacity>
             </View>
@@ -460,14 +506,14 @@ export default function Login() {
             style={[styles.button, isLoading && styles.buttonDisabled]}
           >
             <LinearGradient 
-              colors={["#D4A574", "#C99761", "#B88C5E"]} 
+              colors={[Colors.accent.gold, Colors.accent.goldMedium, Colors.accent.goldDark] as const}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.buttonInner}
             >
               {isLoading ? (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={Colors.background.white} size="small" />
                   <Text style={styles.buttonText}>Signing in...</Text>
                 </View>
               ) : (
@@ -495,7 +541,7 @@ export default function Login() {
           <BlurView intensity={90} tint="light" style={styles.errorBlur}>
             <View style={styles.errorBox}>
               <View style={styles.errorIconContainer}>
-                <Ionicons name="alert-circle" size={28} color="#E74C3C" />
+                <Ionicons name="alert-circle" size={28} color={Colors.status.error} />
               </View>
               <View style={styles.errorContent}>
                 <Text style={styles.errorTitle}>Oops!</Text>
@@ -506,7 +552,7 @@ export default function Login() {
                 style={styles.closeError}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="close-circle" size={24} color="#999" />
+                <Ionicons name="close-circle" size={24} color={Colors.text.light} />
               </TouchableOpacity>
             </View>
           </BlurView>
@@ -517,8 +563,12 @@ export default function Login() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  gradient: { ...StyleSheet.absoluteFillObject },
+  container: { 
+    flex: 1 
+  },
+  gradient: { 
+    ...StyleSheet.absoluteFillObject 
+  },
   keyboardView: { 
     flex: 1, 
     justifyContent: 'center',
@@ -527,21 +577,21 @@ const styles = StyleSheet.create({
   circle: {
     position: "absolute",
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: Colors.opacity.white08,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: Colors.opacity.white15,
   },
   particle: {
     position: "absolute",
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.4)",
+    backgroundColor: Colors.opacity.white40,
   },
   formContainer: {
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.white,
     borderRadius: 28,
     padding: 32,
     elevation: 15,
-    shadowColor: "#000",
+    shadowColor: Colors.opacity.black,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.15,
     shadowRadius: 20,
@@ -554,24 +604,24 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#F5F0FA",
+    backgroundColor: Colors.primary.pale,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
     borderWidth: 3,
-    borderColor: "#E8DEFF",
+    borderColor: Colors.primary.ultraLight,
   },
   title: { 
     fontSize: 32, 
     fontWeight: "800", 
-    color: "#2C2C2C",
+    color: Colors.text.secondary,
     textAlign: "center",
     marginBottom: 8,
     letterSpacing: -0.5,
   },
   subtitle: { 
     fontSize: 15, 
-    color: "#666", 
+    color: Colors.text.tertiary, 
     textAlign: "center",
     fontWeight: "500",
   },
@@ -582,13 +632,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#E8EAED",
-    backgroundColor: "#FAFBFC",
+    borderColor: Colors.border.light,
+    backgroundColor: Colors.background.light,
     borderRadius: 16,
     paddingHorizontal: 16,
     marginVertical: 10,
     height: 58,
-    shadowColor: "#8B7FA8",
+    shadowColor: Colors.primary.main,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -598,14 +648,14 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: "#F5F0FA",
+    backgroundColor: Colors.primary.pale,
     alignItems: "center",
     justifyContent: "center",
   },
   input: { 
     flex: 1, 
     fontSize: 16, 
-    color: "#2C2C2C", 
+    color: Colors.text.secondary, 
     paddingVertical: 12, 
     marginLeft: 12,
     fontWeight: "500",
@@ -618,7 +668,7 @@ const styles = StyleSheet.create({
     borderRadius: 16, 
     overflow: "hidden",
     elevation: 5,
-    shadowColor: "#D4A574",
+    shadowColor: Colors.accent.gold,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -633,7 +683,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   buttonText: { 
-    color: "#fff", 
+    color: Colors.background.white, 
     fontWeight: "700", 
     fontSize: 16,
     letterSpacing: 1,
@@ -649,7 +699,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   link: { 
-    color: "#8B7FA8", 
+    color: Colors.primary.main, 
     fontWeight: "600",
     fontSize: 14,
   },
@@ -658,7 +708,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   footerText: {
-    color: "#999",
+    color: Colors.text.light,
     fontSize: 13,
     fontWeight: "500",
   },
@@ -678,17 +728,17 @@ const styles = StyleSheet.create({
   errorBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.95)",
+    backgroundColor: Colors.opacity.white95,
     padding: 20,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(231, 76, 60, 0.2)",
+    borderColor: 'rgba(231, 76, 60, 0.2)',
   },
   errorIconContainer: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#FFE8E5",
+    backgroundColor: Colors.status.errorLight,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -699,11 +749,11 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#2C2C2C",
+    color: Colors.text.secondary,
     marginBottom: 4,
   },
   errorText: { 
-    color: "#666", 
+    color: Colors.text.tertiary, 
     fontWeight: "500",
     fontSize: 14,
     lineHeight: 20,

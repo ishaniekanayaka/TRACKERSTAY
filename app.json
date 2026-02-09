@@ -4,21 +4,21 @@
     "slug": "trackerstay",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/image_new.png",
+    "icon": "./assets/images/app_iconss.png",
     "scheme": "trackerstay",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ishaniekanayake.trackerstay"
+      "bundleIdentifier": "com.riblez.trackerstay"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/image_new.png",
+        "foregroundImage": "./assets/images/app_iconss.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.ishaniekanayake.trackerstay",
+      "package": "com.riblez.trackerstay",
       "useNextNotificationsApi": true,
       "googleServicesFile": "./google-services.json",
       "permissions": [
@@ -31,7 +31,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/image_new.png"
+      "favicon": "./assets/images/app_icon.png"
     },
     "plugins": [
       "expo-router",
@@ -48,7 +48,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/image_new.png",
+          "image": "./assets/images/app_icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
@@ -76,7 +76,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "e4132c2f-9bd1-4a5d-a197-8ebaae118d0a"
+        "projectId": "090e95f8-5f76-4ece-a6ff-0ce737fef150"
       }
     },
     "androidStatusBar": {

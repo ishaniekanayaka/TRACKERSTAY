@@ -1,36 +1,17 @@
-// import api from "../config/apiConfig";
-
-// const homeService = {
-//   getDailyBookingDetails: async (date: string) => {
-//     try {
-//       const { data } = await api.get(`/hotel/daily-booking-details?date=${date}`);
-//       return data;
-//     } catch (error: any) {
-//       // Let the interceptor handle 401 errors
-//       throw error;
-//     }
-//   },
-// };
-
-// export default homeService;
-
-// services/homeService.ts
 import api from "../config/apiConfig";
 
-export type NotificationItem = {
-  booking_id: string;
-  customer_name: string;
-  customer_phone: string;
-  customer_email: string;
-  checkin_date: string;
-  checkout_date: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
+/* =======================
+   TYPES
+======================= */
+
+export type RoomCount = {
+  room_category_id: number;
+  room_count: number;
+  category_name: string;
 };
 
 export type BookingHistoryItem = {
-  event_type: string;
+  event_type: "created" | "updated" | "deleted";
   timestamp: string;
   user_id: number;
   booking_id: number;
@@ -62,11 +43,7 @@ export type BookingHistoryItem = {
   checking_status: string | null;
   agency_id: number | null;
   rooms: any[];
-  room_counts: Array<{
-    room_category_id: number;
-    room_count: number;
-    category_name: string;
-  }>;
+  room_counts: RoomCount[];
 };
 
 export type BookingHistoryResponse = {
@@ -86,20 +63,43 @@ export type BookingHistoryResponse = {
   history: BookingHistoryItem[];
 };
 
-const homeService = {
+/* =======================
+   SERVICE
+======================= */
 
-
-  getDailyBookingDetails: async (date: string) => {
+const bookingHistoryService = {
+  /**
+   * Get booking history
+   * ✅ GET + query params (backend safe)
+   */
+  getBookingHistory: async (
+    fromDate: string,
+    toDate: string
+  ): Promise<BookingHistoryResponse> => {
     try {
-      const { data } = await api.get(`/hotel/daily-booking-details?date=${date}`);
+      const { data } = await api.get(
+        "/hotel/booking-history",
+        {
+          params: {
+            from_date: fromDate,
+            to_date: toDate,
+          },
+        }
+      );
+
       return data;
     } catch (error: any) {
       throw error;
     }
   },
 
-  // Get Booking History
-  
+  /**
+   * Filter by event type
+   */
+  filterByEventType: (
+    history: BookingHistoryItem[],
+    type: "created" | "updated" | "deleted"
+  ) => history.filter(item => item.event_type === type),
 };
 
-export default homeService;
+export default bookingHistoryService;

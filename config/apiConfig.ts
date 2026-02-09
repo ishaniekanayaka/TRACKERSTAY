@@ -2,7 +2,7 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 
-export const BASE_URL = "https://demo.trackerstay.com/api";
+export const BASE_URL = "https://app.trackerstay.com/api";
 
 const api = axios.create({
   baseURL: BASE_URL,
