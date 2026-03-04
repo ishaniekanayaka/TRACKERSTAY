@@ -20,7 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Colors from "@/components/colors";
+import Colors from "../../components/Colors";
 
 const { width, height } = Dimensions.get("window");
 
