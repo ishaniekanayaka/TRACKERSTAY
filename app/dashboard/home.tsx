@@ -1,1057 +1,3 @@
-// app/dashboard/index.tsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-  Alert,
-  RefreshControl,
-  Modal,
-  Animated,
-  ScrollView,
-  Dimensions,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { useRouter } from "expo-router";
-import { useNotification } from '@/context/NotificationContext';
-import homeService from '../../services/homeService';
-import { logout, getCurrentUser } from '../../services/authService';
-import { TabType, Booking, BookingData, PaymentInfo, StatusStyle } from './../../types/booking';
-import { NotificationItem } from './../../types/notification';
-import HeaderWithMenu from '../../components/HeaderWithMenu';
-
-const { width } = Dimensions.get('window');
-
-interface UserData {
-  id: number;
-  name: string;
-  email: string;
-  lname: string;
-  status: string;
-  role: string;
-  hotel_chain_id: number;
-  hotel_id: number;
-  hotel: {
-    id: number;
-    hotel_name: string;
-    hotel_chain_id: number;
-  };
-}
-
-const Home = () => {
-  const router = useRouter();
-  const { 
-    notifications, 
-    unseenCount 
-  } = useNotification();
-  
-  const [activeTab, setActiveTab] = useState<TabType>('arrivals');
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0]
-  );
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [bookingData, setBookingData] = useState<BookingData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-
-  const detailsSlideAnim = useRef(new Animated.Value(0)).current;
-  const detailsFadeAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    loadBookingDetails();
-  }, [selectedDate]);
-
-  useEffect(() => {
-    if (showDetailsModal) {
-      Animated.parallel([
-        Animated.spring(detailsSlideAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 50,
-          friction: 8,
-        }),
-        Animated.timing(detailsFadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(detailsSlideAnim, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.timing(detailsFadeAnim, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [showDetailsModal]);
-
-  const loadBookingDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await homeService.getDailyBookingDetails(selectedDate);
-      console.log('API Response:', response);
-      
-      if (response && response.details) {
-        setBookingData(response);
-      } else {
-        Alert.alert('Error', 'Invalid response format');
-      }
-    } catch (error) {
-      console.error('Error loading bookings:', error);
-      Alert.alert('Error', error instanceof Error ? error.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadBookingDetails();
-  };
-
-  const getCurrentBookings = (): Booking[] => {
-    if (!bookingData || !bookingData.details) return [];
-    
-    const bookings = bookingData.details[activeTab] || [];
-    console.log(`${activeTab} bookings:`, bookings);
-    return bookings;
-  };
-
-  const calculateNights = (checkIn: string, checkOut: string): number => {
-    const start = new Date(checkIn);
-    const end = new Date(checkOut);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  const getRoomInfo = (booking: Booking): string => {
-    if (booking.booking_room_count && booking.booking_room_count.length > 0) {
-      const roomNames = booking.booking_room_count
-        .filter((room: any) => room.room_count > 0)
-        .map((room: any) => {
-          const roomType = room.room_categories?.room_type || room.room_categories?.category || 'Room';
-          return `${roomType} (${room.room_count})`;
-        });
-      return roomNames.length > 0 ? roomNames.join(', ') : `${booking.room_count} Room${booking.room_count > 1 ? 's' : ''}`;
-    }
-    return `${booking.room_count} Room${booking.room_count > 1 ? 's' : ''}`;
-  };
-
-  const getPaymentInfo = (booking: Booking): PaymentInfo => {
-    const total = booking.total_amount || 0;
-    
-    if (booking.reservation) {
-      const advancePayment = parseFloat(booking.reservation.advance_payment || '0');
-      const balance = parseFloat(booking.reservation.balance || '0');
-      
-      return {
-        total: total.toFixed(2),
-        paid: advancePayment.toFixed(2),
-        balance: (total - advancePayment).toFixed(2),
-      };
-    }
-    
-    return {
-      total: total.toFixed(2),
-      paid: '0.00',
-      balance: total.toFixed(2),
-    };
-  };
-
-  const handleViewBooking = (booking: Booking) => {
-    setSelectedBooking(booking);
-    setShowDetailsModal(true);
-  };
-
-  const handleDateChange = (event: any, date?: Date) => {
-    setShowDatePicker(false);
-    if (date) {
-      setSelectedDate(date.toISOString().split('T')[0]);
-    }
-  };
-
-  const renderStatCard = (
-    icon: any,
-    label: string,
-    value: number,
-    iconColor: string,
-    tab: TabType
-  ) => (
-    <TouchableOpacity 
-      onPress={() => setActiveTab(tab)}
-      activeOpacity={0.7}
-      style={s.statCardContainer}
-    >
-      <View style={[s.statCard, activeTab === tab && s.activeStatCard]}>
-        <View style={[s.statIconContainer, { backgroundColor: iconColor }]}>
-          <Ionicons name={icon} size={24} color="#FFFFFF" />
-        </View>
-        <View style={s.statTextContainer}>
-          <Text style={s.statValue}>{value}</Text>
-          <Text style={s.statLabel}>{label}</Text>
-        </View>
-        {activeTab === tab && (
-          <View style={s.activeIndicator}>
-            <View style={[s.activeDot, { backgroundColor: iconColor }]} />
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-
-  const getStatusStyle = (booking: Booking): StatusStyle => {
-    const status = booking.checking_status || booking.status || '';
-    const statusLower = status.toLowerCase();
-    
-    switch (statusLower) {
-      case 'checkin':
-      case 'checked-in':
-      case 'checked in':
-        return { backgroundColor: '#6B5B9515', borderColor: '#6B5B95', textColor: '#6B5B95' };
-      case 'checkout':
-      case 'checked-out':
-      case 'checked out':
-        return { backgroundColor: '#C9A96515', borderColor: '#C9A965', textColor: '#C9A965' };
-      case 'confirmed':
-        return { backgroundColor: '#10B98115', borderColor: '#10B981', textColor: '#10B981' };
-      case 'pending':
-        return { backgroundColor: '#F59E0B15', borderColor: '#F59E0B', textColor: '#F59E0B' };
-      default:
-        return { backgroundColor: '#EF444415', borderColor: '#EF4444', textColor: '#EF4444' };
-    }
-  };
-
-  const renderBookingCard = ({ item }: { item: Booking }) => {
-    const statusStyle = getStatusStyle(item);
-    const nights = calculateNights(item.checking_date, item.checkout_date);
-    const roomInfo = getRoomInfo(item);
-    const paymentInfo = getPaymentInfo(item);
-    const guestName = `${item.first_name} ${item.last_name}`.trim();
-    
-    return (
-      <TouchableOpacity 
-        onPress={() => handleViewBooking(item)}
-        activeOpacity={0.9}
-      >
-        <View style={s.bookingCard}>
-          <View style={s.bookingHeader}>
-            <View style={s.bookingHeaderLeft}>
-              <Text style={s.bookingName}>{guestName}</Text>
-              <View style={[s.statusBadge, { 
-                backgroundColor: statusStyle.backgroundColor, 
-                borderColor: statusStyle.borderColor 
-              }]}>
-                <Text style={[s.statusText, { color: statusStyle.textColor }]}>
-                  {item.checking_status || item.status}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {item.booking_date && (
-            <View style={s.bookingDateContainer}>
-              <Ionicons name="calendar-outline" size={14} color="#6B5B95" />
-              <Text style={s.bookingDateText}>
-                Booking Date: {new Date(item.booking_date).toLocaleDateString()}
-              </Text>
-            </View>
-          )}
-
-          <LinearGradient 
-            colors={['#6B5B95', '#7D6BA8']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={s.dateRangeBanner}
-          >
-            <View style={s.dateRangeItem}>
-              <Text style={s.dateRangeLabel}>Check-in</Text>
-              <Text style={s.dateRangeDate}>{item.checking_date}</Text>
-              <Text style={s.dateRangeTime}>{item.checking_time || '14:00'}</Text>
-            </View>
-            <View style={s.nightsBadge}>
-              <Text style={s.nightsText}>{nights}</Text>
-              <Text style={s.nightsLabel}>NIGHTS</Text>
-            </View>
-            <View style={s.dateRangeItem}>
-              <Text style={s.dateRangeLabel}>Check-out</Text>
-              <Text style={s.dateRangeDate}>{item.checkout_date}</Text>
-              <Text style={s.dateRangeTime}>{item.checkout_time || '12:00'}</Text>
-            </View>
-          </LinearGradient>
-
-          <View style={s.infoSection}>
-            <View style={s.infoRow}>
-              <View style={s.infoItemFull}>
-                <Ionicons name="bed-outline" size={16} color="#6B5B95" />
-                <Text style={s.infoText}>{roomInfo}</Text>
-              </View>
-            </View>
-
-            <View style={s.infoRow}>
-              <View style={s.infoItem}>
-                <Ionicons name="person-outline" size={16} color="#6B5B95" />
-                <Text style={s.infoText}>{item.adults} Adults</Text>
-              </View>
-              <View style={s.infoItem}>
-                <Ionicons name="person-outline" size={16} color="#C9A965" />
-                <Text style={s.infoText}>{item.children} Children</Text>
-              </View>
-            </View>
-
-            <View style={s.infoRow}>
-              <View style={s.infoItemFull}>
-                <Ionicons name="restaurant-outline" size={16} color="#6B5B95" />
-                <Text style={s.infoText}>{item.breakfast || 'No Meal'}</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={s.paymentContainer}>
-            <View style={s.paymentRow}>
-              <Text style={s.paymentLabel}>Total Amount</Text>
-              <Text style={s.paymentValue}>LKR {paymentInfo.total}</Text>
-            </View>
-            <View style={s.paymentRow}>
-              <Text style={[s.paymentLabel, { color: '#10B981' }]}>Paid</Text>
-              <Text style={[s.paymentValue, { color: '#10B981' }]}>LKR {paymentInfo.paid}</Text>
-            </View>
-            <View style={[s.paymentRow, s.balanceRow]}>
-              <Text style={[s.paymentLabel, { color: '#EF4444', fontWeight: '700' }]}>Balance Due</Text>
-              <Text style={[s.paymentValue, { color: '#EF4444', fontWeight: '700' }]}>LKR {paymentInfo.balance}</Text>
-            </View>
-          </View>
-
-          <View style={s.tapToViewContainer}>
-            <Ionicons name="finger-print" size={16} color="#6B5B95" />
-            <Text style={s.tapToViewText}>Tap to view full details</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderDetailsModal = () => {
-    if (!selectedBooking) return null;
-
-    const statusStyle = getStatusStyle(selectedBooking);
-    const nights = calculateNights(selectedBooking.checking_date, selectedBooking.checkout_date);
-    const roomInfo = getRoomInfo(selectedBooking);
-    const paymentInfo = getPaymentInfo(selectedBooking);
-    const guestName = `${selectedBooking.first_name} ${selectedBooking.last_name}`.trim();
-    
-    const detailsSlideUpTranslate = detailsSlideAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [600, 0],
-    });
-
-    return (
-      <Modal
-        visible={showDetailsModal}
-        transparent={true}
-        animationType="none"
-        onRequestClose={() => setShowDetailsModal(false)}
-      >
-        <Animated.View style={[s.modalOverlay, { opacity: detailsFadeAnim }]}>
-          <TouchableOpacity 
-            style={s.modalBackground} 
-            activeOpacity={1} 
-            onPress={() => setShowDetailsModal(false)}
-          />
-          <Animated.View
-            style={[
-              s.detailsContainer,
-              {
-                transform: [{ translateY: detailsSlideUpTranslate }],
-              },
-            ]}
-          >
-            <LinearGradient colors={['#6B5B95', '#7D6BA8']} style={s.detailsHeader}>
-              <Text style={s.detailsTitle}>Booking Details</Text>
-              <TouchableOpacity onPress={() => setShowDetailsModal(false)}>
-                <Ionicons name="close-circle" size={28} color="#FFFFFF" />
-              </TouchableOpacity>
-            </LinearGradient>
-
-            <ScrollView style={s.detailsScroll}>
-              <View style={s.detailsContent}>
-                <View style={s.detailsSection}>
-                  <Text style={s.detailsSectionTitle}>Guest Information</Text>
-                  <View style={s.detailsRow}>
-                    <Ionicons name="person" size={18} color="#6B5B95" />
-                    <Text style={s.detailsLabel}>Name:</Text>
-                    <Text style={s.detailsValue}>{guestName}</Text>
-                  </View>
-                  {selectedBooking.phone && (
-                    <View style={s.detailsRow}>
-                      <Ionicons name="call" size={18} color="#6B5B95" />
-                      <Text style={s.detailsLabel}>Phone:</Text>
-                      <Text style={s.detailsValue}>{selectedBooking.phone}</Text>
-                    </View>
-                  )}
-                  {selectedBooking.email && (
-                    <View style={s.detailsRow}>
-                      <Ionicons name="mail" size={18} color="#6B5B95" />
-                      <Text style={s.detailsLabel}>Email:</Text>
-                      <Text style={s.detailsValue}>{selectedBooking.email}</Text>
-                    </View>
-                  )}
-                  {selectedBooking.country && (
-                    <View style={s.detailsRow}>
-                      <Ionicons name="flag" size={18} color="#6B5B95" />
-                      <Text style={s.detailsLabel}>Country:</Text>
-                      <Text style={s.detailsValue}>{selectedBooking.country}</Text>
-                    </View>
-                  )}
-                  {selectedBooking.passport && (
-                    <View style={s.detailsRow}>
-                      <Ionicons name="document-text" size={18} color="#6B5B95" />
-                      <Text style={s.detailsLabel}>Passport:</Text>
-                      <Text style={s.detailsValue}>{selectedBooking.passport}</Text>
-                    </View>
-                  )}
-                </View>
-
-                <View style={s.detailsSection}>
-                  <Text style={s.detailsSectionTitle}>Booking Information</Text>
-                  <View style={s.detailsRow}>
-                    <Ionicons name="key" size={18} color="#6B5B95" />
-                    <Text style={s.detailsLabel}>Booking ID:</Text>
-                    <Text style={s.detailsValue}>#{selectedBooking.id}</Text>
-                  </View>
-                  <View style={s.detailsRow}>
-                    <Ionicons name="calendar" size={18} color="#6B5B95" />
-                    <Text style={s.detailsLabel}>Check-in:</Text>
-                    <Text style={s.detailsValue}>{selectedBooking.checking_date} {selectedBooking.checking_time || '14:00'}</Text>
-                  </View>
-                  <View style={s.detailsRow}>
-                    <Ionicons name="calendar" size={18} color="#6B5B95" />
-                    <Text style={s.detailsLabel}>Check-out:</Text>
-                    <Text style={s.detailsValue}>{selectedBooking.checkout_date} {selectedBooking.checkout_time || '12:00'}</Text>
-                  </View>
-                  <View style={s.detailsRow}>
-                    <Ionicons name="moon" size={18} color="#6B5B95" />
-                    <Text style={s.detailsLabel}>Nights:</Text>
-                    <Text style={s.detailsValue}>{nights}</Text>
-                  </View>
-                  <View style={s.detailsRow}>
-                    <Ionicons name="bed" size={18} color="#6B5B95" />
-                    <Text style={s.detailsLabel}>Room Type:</Text>
-                    <Text style={s.detailsValue}>{roomInfo}</Text>
-                  </View>
-                  <View style={s.detailsRow}>
-                    <Ionicons name="people" size={18} color="#6B5B95" />
-                    <Text style={s.detailsLabel}>Guests:</Text>
-                    <Text style={s.detailsValue}>{selectedBooking.adults} Adults, {selectedBooking.children} Children</Text>
-                  </View>
-                  <View style={s.detailsRow}>
-                    <Ionicons name="restaurant" size={18} color="#6B5B95" />
-                    <Text style={s.detailsLabel}>Meal:</Text>
-                    <Text style={s.detailsValue}>{selectedBooking.breakfast || 'No Meal'}</Text>
-                  </View>
-                  {selectedBooking.booking_method && (
-                    <View style={s.detailsRow}>
-                      <Ionicons name="briefcase" size={18} color="#6B5B95" />
-                      <Text style={s.detailsLabel}>Method:</Text>
-                      <Text style={s.detailsValue}>{selectedBooking.booking_method}</Text>
-                    </View>
-                  )}
-                  <View style={s.detailsRow}>
-                    <Ionicons name="information-circle" size={18} color="#6B5B95" />
-                    <Text style={s.detailsLabel}>Status:</Text>
-                    <View style={[s.statusBadge, { 
-                      backgroundColor: statusStyle.backgroundColor, 
-                      borderColor: statusStyle.borderColor,
-                      marginLeft: 'auto'
-                    }]}>
-                      <Text style={[s.statusText, { color: statusStyle.textColor }]}>
-                        {selectedBooking.checking_status || selectedBooking.status}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={s.detailsSection}>
-                  <Text style={s.detailsSectionTitle}>Payment Information</Text>
-                  <View style={s.detailsPaymentRow}>
-                    <Text style={s.detailsPaymentLabel}>Total Amount:</Text>
-                    <Text style={s.detailsPaymentValue}>LKR {paymentInfo.total}</Text>
-                  </View>
-                  <View style={s.detailsPaymentRow}>
-                    <Text style={[s.detailsPaymentLabel, { color: '#10B981' }]}>Paid Amount:</Text>
-                    <Text style={[s.detailsPaymentValue, { color: '#10B981' }]}>LKR {paymentInfo.paid}</Text>
-                  </View>
-                  <View style={[s.detailsPaymentRow, s.detailsPaymentRowHighlight]}>
-                    <Text style={[s.detailsPaymentLabel, { color: '#EF4444', fontWeight: '700' }]}>Balance Due:</Text>
-                    <Text style={[s.detailsPaymentValue, { color: '#EF4444', fontWeight: '700' }]}>LKR {paymentInfo.balance}</Text>
-                  </View>
-                </View>
-              </View>
-            </ScrollView>
-
-            <View style={s.detailsFooter}>
-              <TouchableOpacity style={s.detailsActionButton}>
-                <LinearGradient colors={['#C9A965', '#D4B87A']} style={s.detailsActionButtonGradient}>
-                  <Ionicons name="print-outline" size={20} color="#FFFFFF" />
-                  <Text style={s.detailsActionButtonText}>Print Invoice</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </Animated.View>
-      </Modal>
-    );
-  };
-
-  const currentBookings = getCurrentBookings();
-
-  return (
-    <View style={s.container}>
-      {/* Header - Using Common Component */}
-      <HeaderWithMenu 
-        title="Dashboard"
-        subtitle="Welcome back! Manage your bookings efficiently"
-        showNotification={true}
-        showMenuToggle={true}
-      />
-
-      <View style={s.contentContainer}>
-        {showDatePicker && (
-          <DateTimePicker
-            value={new Date(selectedDate)}
-            mode="date"
-            display="spinner"
-            onChange={handleDateChange}
-            style={s.datePicker}
-          />
-        )}
-        
-        {loading ? (
-          <View style={s.loadingContainer}>
-            <ActivityIndicator size="large" color="#6B5B95" />
-            <Text style={s.loadingText}>Loading bookings...</Text>
-          </View>
-        ) : (
-          <FlatList
-            ListHeaderComponent={
-              <>
-                {/* Date Picker Section */}
-                <View style={s.datePickerContainer}>
-                  <TouchableOpacity 
-                    onPress={() => setShowDatePicker(true)}
-                    style={s.datePickerButton}
-                    activeOpacity={0.8}
-                  >
-                    <View style={s.datePickerGradient}>
-                      <Ionicons name="calendar" size={20} color="#6B5B95" />
-                      <Text style={s.datePickerText}>
-                        {new Date(selectedDate).toLocaleDateString('en-US', {
-                          weekday: 'short',
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </Text>
-                      <Ionicons name="chevron-down" size={16} color="#6B5B95" />
-                    </View>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Stats Cards */}
-                {bookingData && bookingData.summary && (
-                  <View style={s.statsContainer}>
-                    <View style={s.statsGrid}>
-                      {renderStatCard('log-in-outline', 'Arrivals', bookingData.summary.arrivals_count, '#6B5B95', 'arrivals')}
-                      {renderStatCard('log-out-outline', 'Departures', bookingData.summary.departures_count, '#C9A965', 'departures')}
-                      {renderStatCard('home-outline', 'In-House', bookingData.summary.in_house_count, '#8B7BA8', 'in_house')}
-                      {renderStatCard('time-outline', 'All Active', bookingData.summary.pending_count, '#9C8AAD', 'pending')}
-                    </View>
-                  </View>
-                )}
-
-                {/* Current Tab Display */}
-                <View style={s.currentTabContainer}>
-                  <View style={s.currentTabBadge}>
-                    <Ionicons 
-                      name={
-                        activeTab === 'arrivals' ? 'log-in-outline' :
-                        activeTab === 'departures' ? 'log-out-outline' :
-                        activeTab === 'in_house' ? 'home-outline' : 'time-outline'
-                      } 
-                      size={18} 
-                      color="#6B5B95" 
-                    />
-                    <Text style={s.currentTabText}>
-                      {activeTab === 'arrivals' ? 'Arrivals' :
-                       activeTab === 'departures' ? 'Departures' :
-                       activeTab === 'in_house' ? 'In-House Guests' : 'All Active Bookings'}
-                    </Text>
-                    <View style={s.currentTabCount}>
-                      <Text style={s.currentTabCountText}>
-                        {bookingData ? 
-                          activeTab === 'arrivals' ? bookingData.summary.arrivals_count :
-                          activeTab === 'departures' ? bookingData.summary.departures_count :
-                          activeTab === 'in_house' ? bookingData.summary.in_house_count :
-                          bookingData.summary.pending_count : 0
-                        }
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </>
-            }
-            data={currentBookings}
-            keyExtractor={(item) => `${activeTab}-${item.id}`}
-            renderItem={renderBookingCard}
-            contentContainerStyle={s.listContainer}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor="#6B5B95"
-                colors={['#6B5B95']}
-              />
-            }
-            ListEmptyComponent={
-              <View style={s.emptyContainer}>
-                <Ionicons name="calendar-outline" size={60} color="#6B5B95" />
-                <Text style={s.emptyText}>No Bookings Found</Text>
-                <Text style={s.emptySubtext}>
-                  No {activeTab.replace('_', ' ')} for this date
-                </Text>
-              </View>
-            }
-            extraData={activeTab}
-          />
-        )}
-
-        {renderDetailsModal()}
-      </View>
-    </View>
-  );
-};
-
-export default Home;
-
-const s = StyleSheet.create({
-  container: { 
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  contentContainer: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  
-  // Date Picker Styles
-  datePickerContainer: { paddingHorizontal: 16, marginVertical: 16 },
-  datePickerButton: {
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  datePickerGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    borderRadius: 12,
-  },
-  datePickerText: {
-    color: '#1F2937',
-    fontSize: 15,
-    fontWeight: '600',
-    flex: 1,
-    marginLeft: 10,
-  },
-  datePicker: {
-    backgroundColor: '#FFFFFF',
-  },
-  
-  // Stats Grid Styles
-  statsContainer: { paddingHorizontal: 16, marginBottom: 16 },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  statCardContainer: {
-    width: '48%',
-  },
-  statCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    minHeight: 85,
-    position: 'relative',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  activeStatCard: {
-    borderColor: '#6B5B95',
-    shadowColor: '#6B5B95',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  statIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statTextContainer: { flex: 1 },
-  statValue: { color: '#1F2937', fontSize: 22, fontWeight: '700' },
-  statLabel: { color: '#6B7280', fontSize: 12, marginTop: 2, fontWeight: '500' },
-  activeIndicator: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-  },
-  activeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  
-  // Current Tab Display
-  currentTabContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  currentTabBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    gap: 8,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  currentTabText: {
-    color: '#1F2937',
-    fontSize: 15,
-    fontWeight: '600',
-    textAlign: 'center',
-    flex: 1,
-  },
-  currentTabCount: {
-    backgroundColor: '#6B5B95',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  currentTabCountText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  
-  // Loading & Empty States
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { color: '#6B5B95', fontSize: 16, marginTop: 12, fontWeight: '600' },
-  emptyContainer: { paddingVertical: 60, alignItems: 'center' },
-  emptyText: { color: '#1F2937', fontSize: 18, fontWeight: '600', marginTop: 16 },
-  emptySubtext: { color: '#6B7280', fontSize: 14, marginTop: 4 },
-  listContainer: { paddingBottom: 80 },
-  
-  // Booking Card Styles
-  bookingCard: { 
-    marginHorizontal: 16,
-    marginBottom: 16, 
-    borderRadius: 16, 
-    backgroundColor: '#FFFFFF',
-    padding: 18,
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.08, 
-    shadowRadius: 10, 
-    elevation: 4 
-  },
-  bookingHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'flex-start', 
-    marginBottom: 10 
-  },
-  bookingHeaderLeft: { flex: 1 },
-  bookingName: { color: '#1F2937', fontSize: 18, fontWeight: '700', marginBottom: 10 },
-  bookingDateContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 6, 
-    marginBottom: 12 
-  },
-  bookingDateText: { color: '#6B5B95', fontSize: 12, fontWeight: '500' },
-  statusBadge: { 
-    alignSelf: 'flex-start', 
-    paddingHorizontal: 12, 
-    paddingVertical: 5, 
-    borderRadius: 8, 
-    borderWidth: 1.5 
-  },
-  statusText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
-  dateRangeBanner: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    borderRadius: 12, 
-    padding: 14, 
-    marginVertical: 12,
-  },
-  dateRangeItem: { alignItems: 'center', flex: 1 },
-  dateRangeLabel: { 
-    color: '#E9D5FF', 
-    fontSize: 10, 
-    fontWeight: '600', 
-    textTransform: 'uppercase', 
-    marginBottom: 6 
-  },
-  dateRangeDate: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  dateRangeTime: { color: '#E9D5FF', fontSize: 11, marginTop: 3, fontWeight: '500' },
-  nightsBadge: { 
-    backgroundColor: 'rgba(255, 255, 255, 0.25)', 
-    borderRadius: 12, 
-    paddingHorizontal: 16, 
-    paddingVertical: 10, 
-    alignItems: 'center', 
-    marginHorizontal: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-  },
-  nightsText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
-  nightsLabel: { 
-    color: '#FFFFFF', 
-    fontSize: 9, 
-    fontWeight: '600', 
-    textTransform: 'uppercase', 
-    marginTop: 2 
-  },
-  infoSection: { marginVertical: 12, gap: 8 },
-  infoRow: { flexDirection: 'row', gap: 8 },
-  infoItem: { 
-    flex: 1, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 8, 
-    backgroundColor: '#F9FAFB', 
-    padding: 12, 
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  infoItemFull: { 
-    flex: 1, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 8, 
-    backgroundColor: '#F9FAFB', 
-    padding: 12, 
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  infoText: { color: '#1F2937', fontSize: 13, fontWeight: '600', flex: 1 },
-  paymentContainer: { 
-    backgroundColor: '#F9FAFB', 
-    borderRadius: 12, 
-    padding: 14, 
-    marginTop: 12, 
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  paymentRow: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center' 
-  },
-  balanceRow: { 
-    marginTop: 6, 
-    paddingTop: 12, 
-    borderTopWidth: 1.5, 
-    borderTopColor: '#E5E7EB' 
-  },
-  paymentLabel: { color: '#6B7280', fontSize: 13, fontWeight: '600' },
-  paymentValue: { color: '#1F2937', fontSize: 14, fontWeight: '700' },
-  tapToViewContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 14,
-    paddingTop: 14,
-    borderTopWidth: 1.5,
-    borderTopColor: '#E5E7EB',
-  },
-  tapToViewText: {
-    color: '#6B5B95',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  
-  // Modal Styles
-  modalOverlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', 
-    justifyContent: 'flex-end' 
-  },
-  modalBackground: { 
-    position: 'absolute', 
-    top: 0, 
-    left: 0, 
-    right: 0, 
-    bottom: 0 
-  },
-  detailsContainer: { 
-    backgroundColor: '#FFFFFF', 
-    borderTopLeftRadius: 24, 
-    borderTopRightRadius: 24, 
-    maxHeight: '90%',
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: -4 }, 
-    shadowOpacity: 0.15, 
-    shadowRadius: 12, 
-    elevation: 10 
-  },
-  detailsHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    paddingHorizontal: 24, 
-    paddingVertical: 20, 
-    borderTopLeftRadius: 24, 
-    borderTopRightRadius: 24 
-  },
-  detailsTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
-  detailsScroll: { maxHeight: 500 },
-  detailsContent: { padding: 24 },
-  detailsSection: { 
-    marginBottom: 24,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  detailsSectionTitle: { 
-    fontSize: 16, 
-    fontWeight: '700', 
-    color: '#6B5B95', 
-    marginBottom: 14,
-    paddingBottom: 10,
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#E5E7EB',
-  },
-  detailsRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 10,
-  },
-  detailsLabel: { 
-    fontSize: 13, 
-    fontWeight: '600', 
-    color: '#6B7280',
-    width: 100,
-  },
-  detailsValue: { 
-    fontSize: 13, 
-    fontWeight: '600', 
-    color: '#1F2937',
-    flex: 1,
-  },
-  detailsPaymentRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  detailsPaymentRowHighlight: {
-    marginTop: 8,
-    paddingTop: 12,
-    borderTopWidth: 1.5,
-    borderTopColor: '#E5E7EB',
-  },
-  detailsPaymentLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  detailsPaymentValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  detailsFooter: {
-    padding: 24,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-  },
-  detailsActionButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#C9A965',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  detailsActionButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 10,
-  },
-  detailsActionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-});
-
-
-
-
 // // app/dashboard/index.tsx
 // import React, { useState, useEffect, useRef, useCallback } from 'react';
 // import {
@@ -1078,7 +24,6 @@ const s = StyleSheet.create({
 // import { TabType, Booking, BookingData, PaymentInfo, StatusStyle } from './../../types/booking';
 // import { NotificationItem } from './../../types/notification';
 // import HeaderWithMenu from '../../components/HeaderWithMenu';
-// import CalendarView from '../../components/CalendarView';
 
 // const { width } = Dimensions.get('window');
 
@@ -1115,7 +60,6 @@ const s = StyleSheet.create({
 //   const [refreshing, setRefreshing] = useState(false);
 //   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 //   const [showDetailsModal, setShowDetailsModal] = useState(false);
-//   const [showCalendar, setShowCalendar] = useState(false);
 
 //   const detailsSlideAnim = useRef(new Animated.Value(0)).current;
 //   const detailsFadeAnim = useRef(new Animated.Value(0)).current;
@@ -1628,18 +572,6 @@ const s = StyleSheet.create({
 //                   </TouchableOpacity>
 //                 </View>
 
-//                 {/* Calendar View Button */}
-//                 <TouchableOpacity 
-//                   onPress={() => setShowCalendar(true)}
-//                   style={s.calendarViewButton}
-//                   activeOpacity={0.8}
-//                 >
-//                   <LinearGradient colors={['#6B5B95', '#7D6BA8']} style={s.calendarViewGradient}>
-//                     <Ionicons name="grid-outline" size={20} color="#FFFFFF" />
-//                     <Text style={s.calendarViewText}>Calendar View</Text>
-//                   </LinearGradient>
-//                 </TouchableOpacity>
-
 //                 {/* Stats Cards */}
 //                 {bookingData && bookingData.summary && (
 //                   <View style={s.statsContainer}>
@@ -1710,15 +642,6 @@ const s = StyleSheet.create({
 
 //         {renderDetailsModal()}
 //       </View>
-
-//       {/* Calendar Modal */}
-//       <Modal
-//         visible={showCalendar}
-//         animationType="slide"
-//         presentationStyle="fullScreen"
-//       >
-//         <CalendarView onClose={() => setShowCalendar(false)} />
-//       </Modal>
 //     </View>
 //   );
 // };
@@ -1736,7 +659,7 @@ const s = StyleSheet.create({
 //   },
   
 //   // Date Picker Styles
-//   datePickerContainer: { paddingHorizontal: 16, marginTop: 16 },
+//   datePickerContainer: { paddingHorizontal: 16, marginVertical: 16 },
 //   datePickerButton: {
 //     borderRadius: 12,
 //     backgroundColor: '#FFFFFF',
@@ -1765,33 +688,8 @@ const s = StyleSheet.create({
 //     backgroundColor: '#FFFFFF',
 //   },
   
-//   // Calendar View Button
-//   calendarViewButton: {
-//     marginHorizontal: 16,
-//     marginTop: 12,
-//     borderRadius: 12,
-//     overflow: 'hidden',
-//     shadowColor: '#6B5B95',
-//     shadowOffset: { width: 0, height: 2 },
-//     shadowOpacity: 0.2,
-//     shadowRadius: 8,
-//     elevation: 4,
-//   },
-//   calendarViewGradient: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     justifyContent: 'center',
-//     paddingVertical: 14,
-//     gap: 10,
-//   },
-//   calendarViewText: {
-//     color: '#FFFFFF',
-//     fontSize: 15,
-//     fontWeight: '700',
-//   },
-  
 //   // Stats Grid Styles
-//   statsContainer: { paddingHorizontal: 16, marginTop: 16, marginBottom: 16 },
+//   statsContainer: { paddingHorizontal: 16, marginBottom: 16 },
 //   statsGrid: {
 //     flexDirection: 'row',
 //     flexWrap: 'wrap',
@@ -2150,3 +1048,1175 @@ const s = StyleSheet.create({
 //     fontWeight: '700',
 //   },
 // });
+// app/dashboard/index.tsx
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  Modal,
+  Animated,
+  ScrollView,
+  Dimensions,
+  Image,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useRouter } from 'expo-router';
+import { useNotification } from '@/context/NotificationContext';
+import homeService from '../../services/homeService';
+import { TabType, Booking, BookingData, PaymentInfo, StatusStyle } from './../../types/booking';
+import HeaderWithMenu from '../../components/HeaderWithMenu';
+
+const { width } = Dimensions.get('window');
+
+// ── Booking Method → Image Map ────────────────────────────────────────────────
+const BOOKING_METHOD_IMAGES: Record<string, any> = {
+  airbnb:      require('../../assets/adult/airbnb.png'),
+  'air bnb':   require('../../assets/adult/airbnb.png'),
+  booking:     require('../../assets/adult/booking.png'),
+  'booking.com': require('../../assets/adult/booking.png'),
+  agoda:       require('../../assets/adult/agoda.png'),
+  expedia:     require('../../assets/adult/expedia.png'),
+  online:      require('../../assets/adult/online.png'),
+  agency:      require('../../assets/adult/agency.png'),
+  ai:          require('../../assets/adult/Ai.png'),
+  download:    require('../../assets/adult/download.png'),
+  ravan:       require('../../assets/adult/ravan.png'),
+  walking:     require('../../assets/adult/walking.png'),
+  'walk in':   require('../../assets/adult/walking.png'),
+  walkin:      require('../../assets/adult/walking.png'),
+  phone:       require('../../assets/adult/phone.png'),
+  no:          require('../../assets/adult/no.png'),
+  direct:      require('../../assets/adult/a.png'),
+};
+
+/**
+ * Returns the local image asset for a given booking method string.
+ * Falls back to null if no match found.
+ */
+const getBookingMethodImage = (method: string | null | undefined) => {
+  if (!method) return null;
+  const key = method.toLowerCase().trim();
+  // Exact match first
+  if (BOOKING_METHOD_IMAGES[key]) return BOOKING_METHOD_IMAGES[key];
+  // Partial match
+  for (const [k, v] of Object.entries(BOOKING_METHOD_IMAGES)) {
+    if (key.includes(k) || k.includes(key)) return v;
+  }
+  return null;
+};
+
+const Home = () => {
+  const router = useRouter();
+  const { notifications, unseenCount } = useNotification();
+
+  const [activeTab, setActiveTab]           = useState<TabType>('arrivals');
+  const [selectedDate, setSelectedDate]     = useState(new Date().toISOString().split('T')[0]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [bookingData, setBookingData]       = useState<BookingData | null>(null);
+  const [loading, setLoading]               = useState(false);
+  const [refreshing, setRefreshing]         = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const detailsSlideAnim = useRef(new Animated.Value(0)).current;
+  const detailsFadeAnim  = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    loadBookingDetails();
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (showDetailsModal) {
+      Animated.parallel([
+        Animated.spring(detailsSlideAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 8,
+        }),
+        Animated.timing(detailsFadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(detailsSlideAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(detailsFadeAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showDetailsModal]);
+
+  const loadBookingDetails = async () => {
+    try {
+      setLoading(true);
+      setErrorMessage(null);
+
+      const response = await homeService.getDailyBookingDetails(selectedDate);
+      console.log('API Response:', response);
+
+      if (response && response.details) {
+        setBookingData(response);
+      } else {
+        setErrorMessage('Received an unexpected response from the server. Please try again.');
+        setBookingData(null);
+      }
+    } catch (error) {
+      console.error('Error loading bookings:', error);
+      const msg =
+        error instanceof Error
+          ? error.message
+          : 'Something went wrong. Please try again.';
+
+      setErrorMessage(msg);
+      setBookingData(null);
+
+      Alert.alert(
+        'Connection Problem',
+        msg,
+        [
+          { text: 'Retry', onPress: () => loadBookingDetails() },
+          { text: 'OK', style: 'cancel' },
+        ],
+        { cancelable: true }
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadBookingDetails();
+  };
+
+  const getCurrentBookings = (): Booking[] => {
+    if (!bookingData || !bookingData.details) return [];
+    return bookingData.details[activeTab] || [];
+  };
+
+  const getTotalRoomsForTab = (tab: TabType): number => {
+    if (!bookingData || !bookingData.details) return 0;
+    const bookings: Booking[] = bookingData.details[tab] || [];
+    return bookings.reduce((total, booking) => {
+      const roomCount = parseInt(String(booking.room_count || '1'), 10);
+      return total + (isNaN(roomCount) ? 1 : roomCount);
+    }, 0);
+  };
+
+  const calculateNights = (checkIn: string, checkOut: string): number => {
+    const start    = new Date(checkIn);
+    const end      = new Date(checkOut);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const getRoomInfo = (booking: Booking): string => {
+    if (booking.booking_room_count && booking.booking_room_count.length > 0) {
+      const roomNames = booking.booking_room_count
+        .filter((room: any) => room.room_count > 0)
+        .map((room: any) => {
+          const roomType =
+            room.room_categories?.room_type ||
+            room.room_categories?.category ||
+            'Room';
+          return `${roomType} (${room.room_count})`;
+        });
+      return roomNames.length > 0
+        ? roomNames.join(', ')
+        : `${booking.room_count} Room${booking.room_count > 1 ? 's' : ''}`;
+    }
+    return `${booking.room_count} Room${booking.room_count > 1 ? 's' : ''}`;
+  };
+
+  const getPaymentInfo = (booking: Booking): PaymentInfo => {
+    const total = booking.total_amount || 0;
+    if (booking.reservation) {
+      const advancePayment = parseFloat(booking.reservation.advance_payment || '0');
+      return {
+        total:   total.toFixed(2),
+        paid:    advancePayment.toFixed(2),
+        balance: (total - advancePayment).toFixed(2),
+      };
+    }
+    return {
+      total:   total.toFixed(2),
+      paid:    '0.00',
+      balance: total.toFixed(2),
+    };
+  };
+
+  const handleViewBooking = (booking: Booking) => {
+    setSelectedBooking(booking);
+    setShowDetailsModal(true);
+  };
+
+  const handleDateChange = (event: any, date?: Date) => {
+    setShowDatePicker(false);
+    if (date) setSelectedDate(date.toISOString().split('T')[0]);
+  };
+
+  const getStatusStyle = (booking: Booking): StatusStyle => {
+    const status      = booking.checking_status || booking.status || '';
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
+      case 'checkin':
+      case 'checked-in':
+      case 'checked in':
+        return { backgroundColor: '#6B5B9515', borderColor: '#6B5B95', textColor: '#6B5B95' };
+      case 'checkout':
+      case 'checked-out':
+      case 'checked out':
+        return { backgroundColor: '#C9A96515', borderColor: '#C9A965', textColor: '#C9A965' };
+      case 'confirmed':
+        return { backgroundColor: '#10B98115', borderColor: '#10B981', textColor: '#10B981' };
+      case 'pending':
+        return { backgroundColor: '#F59E0B15', borderColor: '#F59E0B', textColor: '#F59E0B' };
+      default:
+        return { backgroundColor: '#EF444415', borderColor: '#EF4444', textColor: '#EF4444' };
+    }
+  };
+
+  // ── Error Banner ──────────────────────────────────────────────────────────
+  const renderErrorBanner = () => {
+    if (!errorMessage) return null;
+    return (
+      <View style={s.errorBanner}>
+        <View style={s.errorBannerInner}>
+          <Ionicons name="cloud-offline-outline" size={30} color="#EF4444" />
+          <View style={s.errorTextContainer}>
+            <Text style={s.errorTitle}>Failed to Load Data</Text>
+            <Text style={s.errorSubtitle}>{errorMessage}</Text>
+          </View>
+        </View>
+        <TouchableOpacity style={s.retryButton} onPress={loadBookingDetails}>
+          <Ionicons name="refresh-outline" size={15} color="#FFFFFF" />
+          <Text style={s.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // ── Stat Card ────────────────────────────────────────────────────────────
+  const renderStatCard = (
+    icon: any,
+    label: string,
+    guestCount: number,
+    iconColor: string,
+    tab: TabType
+  ) => {
+    const roomCount = bookingData ? getTotalRoomsForTab(tab) : 0;
+
+    return (
+      <TouchableOpacity
+        onPress={() => setActiveTab(tab)}
+        activeOpacity={0.7}
+        style={s.statCardContainer}
+      >
+        <View style={[s.statCard, activeTab === tab && s.activeStatCard]}>
+          <View style={[s.statIconContainer, { backgroundColor: iconColor }]}>
+            <Ionicons name={icon} size={22} color="#FFFFFF" />
+          </View>
+          <View style={s.statTextContainer}>
+            <Text style={s.statValue}>{guestCount}</Text>
+            <Text style={s.statLabel}>{label}</Text>
+            <View style={s.roomCountBadge}>
+              <Ionicons name="home-outline" size={10} color="#6B5B95" />
+              <Text style={s.roomCountText}>Rooms: {roomCount}</Text>
+            </View>
+          </View>
+          {activeTab === tab && (
+            <View style={s.activeIndicator}>
+              <View style={[s.activeDot, { backgroundColor: iconColor }]} />
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // ── Booking Method Badge (with image) ────────────────────────────────────
+  const renderBookingMethodBadge = (bookingMethod: string | null | undefined) => {
+    if (!bookingMethod) return null;
+    const methodImage = getBookingMethodImage(bookingMethod);
+
+    return (
+      <View style={s.bookingMethodBadge}>
+        {methodImage ? (
+          <Image
+            source={methodImage}
+            style={s.bookingMethodImage}
+            resizeMode="contain"
+          />
+        ) : (
+          <Ionicons name="globe-outline" size={16} color="#6B5B95" />
+        )}
+        <Text style={s.bookingMethodText}>{bookingMethod}</Text>
+      </View>
+    );
+  };
+
+  // ── Booking Card ──────────────────────────────────────────────────────────
+  const renderBookingCard = ({ item }: { item: Booking }) => {
+    const statusStyle = getStatusStyle(item);
+    const nights      = calculateNights(item.checking_date, item.checkout_date);
+    const roomInfo    = getRoomInfo(item);
+    const paymentInfo = getPaymentInfo(item);
+    const guestName   = `${item.first_name} ${item.last_name}`.trim();
+
+    return (
+      <TouchableOpacity onPress={() => handleViewBooking(item)} activeOpacity={0.9}>
+        <View style={s.bookingCard}>
+          {/* ── Header: booking method image (left) + name & status (right) ── */}
+          <View style={s.bookingHeader}>
+            {/* Booking method image on top-left */}
+            {renderBookingMethodBadge(item.booking_method)}
+            <View style={s.bookingHeaderLeft}>
+              <Text style={s.bookingName}>{guestName}</Text>
+              <View style={s.bookingHeaderMeta}>
+                <View style={[s.statusBadge, {
+                  backgroundColor: statusStyle.backgroundColor,
+                  borderColor: statusStyle.borderColor,
+                }]}>
+                  <Text style={[s.statusText, { color: statusStyle.textColor }]}>
+                    {item.checking_status || item.status}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {item.booking_date && (
+            <View style={s.bookingDateContainer}>
+              <Ionicons name="calendar-outline" size={14} color="#6B5B95" />
+              <Text style={s.bookingDateText}>
+                Booking Date: {new Date(item.booking_date).toLocaleDateString()}
+              </Text>
+            </View>
+          )}
+
+          <LinearGradient
+            colors={['#6B5B95', '#7D6BA8']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={s.dateRangeBanner}
+          >
+            <View style={s.dateRangeItem}>
+              <Text style={s.dateRangeLabel}>Check-in</Text>
+              <Text style={s.dateRangeDate}>{item.checking_date}</Text>
+              <Text style={s.dateRangeTime}>{item.checking_time || '14:00'}</Text>
+            </View>
+            <View style={s.nightsBadge}>
+              <Text style={s.nightsText}>{nights}</Text>
+              <Text style={s.nightsLabel}>NIGHTS</Text>
+            </View>
+            <View style={s.dateRangeItem}>
+              <Text style={s.dateRangeLabel}>Check-out</Text>
+              <Text style={s.dateRangeDate}>{item.checkout_date}</Text>
+              <Text style={s.dateRangeTime}>{item.checkout_time || '12:00'}</Text>
+            </View>
+          </LinearGradient>
+
+          <View style={s.infoSection}>
+            <View style={s.infoRow}>
+              <View style={s.infoItemFull}>
+                <Ionicons name="bed-outline" size={16} color="#6B5B95" />
+                <Text style={s.infoText}>{roomInfo}</Text>
+              </View>
+              <View style={s.infoItemFull}>
+                <Ionicons name="home-outline" size={16} color="#6B5B95" />
+                <Text style={s.infoText}>{item.room_count || 1} Rooms</Text>
+              </View>
+            </View>
+            <View style={s.infoRow}>
+              <View style={s.infoItem}>
+                <Ionicons name="person-outline" size={16} color="#6B5B95" />
+                <Text style={s.infoText}>{item.adults} Adults</Text>
+              </View>
+              <View style={s.infoItem}>
+                <Ionicons name="person-outline" size={16} color="#C9A965" />
+                <Text style={s.infoText}>{item.children} Children</Text>
+              </View>
+            </View>
+            <View style={s.infoRow}>
+              <View style={s.infoItemFull}>
+                <Ionicons name="restaurant-outline" size={16} color="#6B5B95" />
+                <Text style={s.infoText}>{item.breakfast || 'No Meal'}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={s.paymentContainer}>
+            <View style={s.paymentRow}>
+              <Text style={s.paymentLabel}>Total Amount</Text>
+              <Text style={s.paymentValue}>LKR {paymentInfo.total}</Text>
+            </View>
+            <View style={s.paymentRow}>
+              <Text style={[s.paymentLabel, { color: '#10B981' }]}>Paid</Text>
+              <Text style={[s.paymentValue, { color: '#10B981' }]}>LKR {paymentInfo.paid}</Text>
+            </View>
+            <View style={[s.paymentRow, s.balanceRow]}>
+              <Text style={[s.paymentLabel, { color: '#EF4444', fontWeight: '700' }]}>Balance Due</Text>
+              <Text style={[s.paymentValue, { color: '#EF4444', fontWeight: '700' }]}>LKR {paymentInfo.balance}</Text>
+            </View>
+          </View>
+
+          <View style={s.tapToViewContainer}>
+            <Ionicons name="finger-print" size={16} color="#6B5B95" />
+            <Text style={s.tapToViewText}>Tap to view full details</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // ── Details Modal ─────────────────────────────────────────────────────────
+  const renderDetailsModal = () => {
+    if (!selectedBooking) return null;
+
+    const statusStyle = getStatusStyle(selectedBooking);
+    const nights      = calculateNights(selectedBooking.checking_date, selectedBooking.checkout_date);
+    const roomInfo    = getRoomInfo(selectedBooking);
+    const paymentInfo = getPaymentInfo(selectedBooking);
+    const guestName   = `${selectedBooking.first_name} ${selectedBooking.last_name}`.trim();
+    const methodImage = getBookingMethodImage(selectedBooking.booking_method);
+
+    const detailsSlideUpTranslate = detailsSlideAnim.interpolate({
+      inputRange:  [0, 1],
+      outputRange: [600, 0],
+    });
+
+    return (
+      <Modal
+        visible={showDetailsModal}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setShowDetailsModal(false)}
+      >
+        <Animated.View style={[s.modalOverlay, { opacity: detailsFadeAnim }]}>
+          <TouchableOpacity
+            style={s.modalBackground}
+            activeOpacity={1}
+            onPress={() => setShowDetailsModal(false)}
+          />
+          <Animated.View
+            style={[s.detailsContainer, { transform: [{ translateY: detailsSlideUpTranslate }] }]}
+          >
+            <LinearGradient colors={['#6B5B95', '#7D6BA8']} style={s.detailsHeader}>
+              <Text style={s.detailsTitle}>Booking Details</Text>
+              <TouchableOpacity onPress={() => setShowDetailsModal(false)}>
+                <Ionicons name="close-circle" size={28} color="#FFFFFF" />
+              </TouchableOpacity>
+            </LinearGradient>
+
+            <ScrollView style={s.detailsScroll}>
+              <View style={s.detailsContent}>
+
+                {/* Guest Info */}
+                <View style={s.detailsSection}>
+                  <Text style={s.detailsSectionTitle}>Guest Information</Text>
+                  <View style={s.detailsRow}>
+                    <Ionicons name="person" size={18} color="#6B5B95" />
+                    <Text style={s.detailsLabel}>Name:</Text>
+                    <Text style={s.detailsValue}>{guestName}</Text>
+                  </View>
+                  {selectedBooking.phone && (
+                    <View style={s.detailsRow}>
+                      <Ionicons name="call" size={18} color="#6B5B95" />
+                      <Text style={s.detailsLabel}>Phone:</Text>
+                      <Text style={s.detailsValue}>{selectedBooking.phone}</Text>
+                    </View>
+                  )}
+                  {selectedBooking.email && (
+                    <View style={s.detailsRow}>
+                      <Ionicons name="mail" size={18} color="#6B5B95" />
+                      <Text style={s.detailsLabel}>Email:</Text>
+                      <Text style={s.detailsValue}>{selectedBooking.email}</Text>
+                    </View>
+                  )}
+                  {selectedBooking.country && (
+                    <View style={s.detailsRow}>
+                      <Ionicons name="flag" size={18} color="#6B5B95" />
+                      <Text style={s.detailsLabel}>Country:</Text>
+                      <Text style={s.detailsValue}>{selectedBooking.country}</Text>
+                    </View>
+                  )}
+                  {selectedBooking.passport && (
+                    <View style={s.detailsRow}>
+                      <Ionicons name="document-text" size={18} color="#6B5B95" />
+                      <Text style={s.detailsLabel}>Passport:</Text>
+                      <Text style={s.detailsValue}>{selectedBooking.passport}</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Booking Info */}
+                <View style={s.detailsSection}>
+                  <Text style={s.detailsSectionTitle}>Booking Information</Text>
+                  <View style={s.detailsRow}>
+                    <Ionicons name="key" size={18} color="#6B5B95" />
+                    <Text style={s.detailsLabel}>Booking ID:</Text>
+                    <Text style={s.detailsValue}>#{selectedBooking.id}</Text>
+                  </View>
+                  <View style={s.detailsRow}>
+                    <Ionicons name="calendar" size={18} color="#6B5B95" />
+                    <Text style={s.detailsLabel}>Check-in:</Text>
+                    <Text style={s.detailsValue}>{selectedBooking.checking_date} {selectedBooking.checking_time || '14:00'}</Text>
+                  </View>
+                  <View style={s.detailsRow}>
+                    <Ionicons name="calendar" size={18} color="#6B5B95" />
+                    <Text style={s.detailsLabel}>Check-out:</Text>
+                    <Text style={s.detailsValue}>{selectedBooking.checkout_date} {selectedBooking.checkout_time || '12:00'}</Text>
+                  </View>
+                  <View style={s.detailsRow}>
+                    <Ionicons name="moon" size={18} color="#6B5B95" />
+                    <Text style={s.detailsLabel}>Nights:</Text>
+                    <Text style={s.detailsValue}>{nights}</Text>
+                  </View>
+                  <View style={s.detailsRow}>
+                    <Ionicons name="bed" size={18} color="#6B5B95" />
+                    <Text style={s.detailsLabel}>Room Type:</Text>
+                    <Text style={s.detailsValue}>{roomInfo}</Text>
+                  </View>
+                  <View style={s.detailsRow}>
+                    <Ionicons name="people" size={18} color="#6B5B95" />
+                    <Text style={s.detailsLabel}>Guests:</Text>
+                    <Text style={s.detailsValue}>{selectedBooking.adults} Adults, {selectedBooking.children} Children</Text>
+                  </View>
+                  <View style={s.detailsRow}>
+                    <Ionicons name="restaurant" size={18} color="#6B5B95" />
+                    <Text style={s.detailsLabel}>Meal:</Text>
+                    <Text style={s.detailsValue}>{selectedBooking.breakfast || 'No Meal'}</Text>
+                  </View>
+                  {/* ── Booking Method with image ── */}
+                  {selectedBooking.booking_method && (
+                    <View style={s.detailsRow}>
+                      <Ionicons name="briefcase" size={18} color="#6B5B95" />
+                      <Text style={s.detailsLabel}>Method:</Text>
+                      <View style={s.detailsMethodContainer}>
+                        {methodImage && (
+                          <Image
+                            source={methodImage}
+                            style={s.detailsMethodImage}
+                            resizeMode="contain"
+                          />
+                        )}
+                        <Text style={s.detailsValue}>{selectedBooking.booking_method}</Text>
+                      </View>
+                    </View>
+                  )}
+                  <View style={s.detailsRow}>
+                    <Ionicons name="information-circle" size={18} color="#6B5B95" />
+                    <Text style={s.detailsLabel}>Status:</Text>
+                    <View style={[s.statusBadge, {
+                      backgroundColor: statusStyle.backgroundColor,
+                      borderColor: statusStyle.borderColor,
+                      marginLeft: 'auto',
+                    }]}>
+                      <Text style={[s.statusText, { color: statusStyle.textColor }]}>
+                        {selectedBooking.checking_status || selectedBooking.status}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Payment Info */}
+                <View style={s.detailsSection}>
+                  <Text style={s.detailsSectionTitle}>Payment Information</Text>
+                  <View style={s.detailsPaymentRow}>
+                    <Text style={s.detailsPaymentLabel}>Total Amount:</Text>
+                    <Text style={s.detailsPaymentValue}>LKR {paymentInfo.total}</Text>
+                  </View>
+                  <View style={s.detailsPaymentRow}>
+                    <Text style={[s.detailsPaymentLabel, { color: '#10B981' }]}>Paid Amount:</Text>
+                    <Text style={[s.detailsPaymentValue, { color: '#10B981' }]}>LKR {paymentInfo.paid}</Text>
+                  </View>
+                  <View style={[s.detailsPaymentRow, s.detailsPaymentRowHighlight]}>
+                    <Text style={[s.detailsPaymentLabel, { color: '#EF4444', fontWeight: '700' }]}>Balance Due:</Text>
+                    <Text style={[s.detailsPaymentValue, { color: '#EF4444', fontWeight: '700' }]}>LKR {paymentInfo.balance}</Text>
+                  </View>
+                </View>
+
+              </View>
+            </ScrollView>
+
+            <View style={s.detailsFooter}>
+              <TouchableOpacity style={s.detailsActionButton}>
+                <LinearGradient colors={['#C9A965', '#D4B87A']} style={s.detailsActionButtonGradient}>
+                  <Ionicons name="print-outline" size={20} color="#FFFFFF" />
+                  <Text style={s.detailsActionButtonText}>Print Invoice</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+    );
+  };
+
+  const currentBookings = getCurrentBookings();
+
+  return (
+    <View style={s.container}>
+      <HeaderWithMenu
+        title="Dashboard"
+        subtitle="Welcome back! Manage your bookings efficiently"
+        showNotification={true}
+        showMenuToggle={true}
+      />
+
+      <View style={s.contentContainer}>
+        {showDatePicker && (
+          <DateTimePicker
+            value={new Date(selectedDate)}
+            mode="date"
+            display="spinner"
+            onChange={handleDateChange}
+            style={s.datePicker}
+          />
+        )}
+
+        {loading ? (
+          <View style={s.loadingContainer}>
+            <ActivityIndicator size="large" color="#6B5B95" />
+            <Text style={s.loadingText}>Loading bookings...</Text>
+          </View>
+        ) : (
+          <FlatList
+            ListHeaderComponent={
+              <>
+                {renderErrorBanner()}
+
+                {/* Date Picker */}
+                <View style={s.datePickerContainer}>
+                  <TouchableOpacity
+                    onPress={() => setShowDatePicker(true)}
+                    style={s.datePickerButton}
+                    activeOpacity={0.8}
+                  >
+                    <View style={s.datePickerGradient}>
+                      <Ionicons name="calendar" size={20} color="#6B5B95" />
+                      <Text style={s.datePickerText}>
+                        {new Date(selectedDate).toLocaleDateString('en-US', {
+                          weekday: 'short',
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </Text>
+                      <Ionicons name="chevron-down" size={16} color="#6B5B95" />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Stats Cards */}
+                {bookingData && bookingData.summary && (
+                  <View style={s.statsContainer}>
+                    <View style={s.statsGrid}>
+                      {renderStatCard('log-in-outline',  'Arrivals',   bookingData.summary.arrivals_count,   '#6B5B95', 'arrivals')}
+                      {renderStatCard('log-out-outline', 'Departures', bookingData.summary.departures_count, '#C9A965', 'departures')}
+                      {renderStatCard('home-outline',    'In-House',   bookingData.summary.in_house_count,   '#8B7BA8', 'in_house')}
+                      {renderStatCard('time-outline',    'All Active', bookingData.summary.pending_count,    '#9C8AAD', 'pending')}
+                    </View>
+                  </View>
+                )}
+
+                {/* Active Tab Badge */}
+                {bookingData && (
+                  <View style={s.currentTabContainer}>
+                    <View style={s.currentTabBadge}>
+                      <Ionicons
+                        name={
+                          activeTab === 'arrivals'   ? 'log-in-outline' :
+                          activeTab === 'departures' ? 'log-out-outline' :
+                          activeTab === 'in_house'   ? 'home-outline' : 'time-outline'
+                        }
+                        size={18}
+                        color="#6B5B95"
+                      />
+                      <Text style={s.currentTabText}>
+                        {activeTab === 'arrivals'   ? 'Arrivals' :
+                         activeTab === 'departures' ? 'Departures' :
+                         activeTab === 'in_house'   ? 'In-House Guests' : 'All Active Bookings'}
+                      </Text>
+                      <View style={s.currentTabCount}>
+                        <Text style={s.currentTabCountText}>
+                          {activeTab === 'arrivals'   ? bookingData.summary.arrivals_count :
+                           activeTab === 'departures' ? bookingData.summary.departures_count :
+                           activeTab === 'in_house'   ? bookingData.summary.in_house_count :
+                           bookingData.summary.pending_count}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </>
+            }
+            data={currentBookings}
+            keyExtractor={(item) => `${activeTab}-${item.id}`}
+            renderItem={renderBookingCard}
+            contentContainerStyle={s.listContainer}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#6B5B95"
+                colors={['#6B5B95']}
+              />
+            }
+            ListEmptyComponent={
+              !errorMessage ? (
+                <View style={s.emptyContainer}>
+                  <Ionicons name="calendar-outline" size={60} color="#6B5B95" />
+                  <Text style={s.emptyText}>No Bookings Found</Text>
+                  <Text style={s.emptySubtext}>
+                    No {activeTab.replace('_', ' ')} for this date
+                  </Text>
+                </View>
+              ) : null
+            }
+            extraData={activeTab}
+          />
+        )}
+
+        {renderDetailsModal()}
+      </View>
+    </View>
+  );
+};
+
+export default Home;
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  container:        { flex: 1, backgroundColor: '#F5F5F5' },
+  contentContainer: { flex: 1, backgroundColor: '#F5F5F5' },
+
+  // Error Banner
+  errorBanner: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#FECACA',
+    padding: 16,
+    gap: 12,
+  },
+  errorBannerInner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  errorTextContainer: { flex: 1 },
+  errorTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#DC2626',
+    marginBottom: 4,
+  },
+  errorSubtitle: {
+    fontSize: 13,
+    color: '#EF4444',
+    lineHeight: 18,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#EF4444',
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  // Date Picker
+  datePickerContainer: { paddingHorizontal: 16, marginVertical: 16 },
+  datePickerButton: {
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  datePickerGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+  },
+  datePickerText: {
+    color: '#1F2937',
+    fontSize: 15,
+    fontWeight: '600',
+    flex: 1,
+    marginLeft: 10,
+  },
+  datePicker: { backgroundColor: '#FFFFFF' },
+
+  // Stats Grid
+  statsContainer:    { paddingHorizontal: 16, marginBottom: 16 },
+  statsGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  statCardContainer: { width: '48%' },
+  statCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    minHeight: 90,
+    position: 'relative',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  activeStatCard: {
+    borderColor: '#6B5B95',
+    shadowColor: '#6B5B95',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  statIconContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statTextContainer: { flex: 1 },
+  statValue:         { color: '#1F2937', fontSize: 22, fontWeight: '700', lineHeight: 26 },
+  statLabel:         { color: '#6B7280', fontSize: 11, marginTop: 1, fontWeight: '500' },
+
+  roomCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 5,
+    backgroundColor: '#F3F0FF',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  roomCountText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#6B5B95',
+  },
+
+  activeIndicator:   { position: 'absolute', top: 10, right: 10 },
+  activeDot:         { width: 8, height: 8, borderRadius: 4 },
+
+  // Current Tab Badge
+  currentTabContainer: { paddingHorizontal: 16, marginBottom: 16 },
+  currentTabBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  currentTabText: {
+    color: '#1F2937',
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+    flex: 1,
+  },
+  currentTabCount: {
+    backgroundColor: '#6B5B95',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  currentTabCountText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+
+  // Loading & Empty
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText:      { color: '#6B5B95', fontSize: 16, marginTop: 12, fontWeight: '600' },
+  emptyContainer:   { paddingVertical: 60, alignItems: 'center' },
+  emptyText:        { color: '#1F2937', fontSize: 18, fontWeight: '600', marginTop: 16 },
+  emptySubtext:     { color: '#6B7280', fontSize: 14, marginTop: 4 },
+  listContainer:    { paddingBottom: 80 },
+
+  // Booking Card
+  bookingCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  bookingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  bookingHeaderLeft:   { flex: 1, marginLeft: 10 },
+  bookingHeaderMeta:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  bookingName:         { color: '#1F2937', fontSize: 18, fontWeight: '700' },
+  bookingDateContainer:{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  bookingDateText:     { color: '#6B5B95', fontSize: 12, fontWeight: '500' },
+
+  // ── NEW: Booking method badge ──────────────────────────────────────────────
+  bookingMethodBadge: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F9F7FF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    padding: 8,
+    minWidth: 70,
+    gap: 4,
+  },
+  bookingMethodImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+  },
+  bookingMethodText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#6B5B95',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  },
+
+  statusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1.5,
+  },
+  statusText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  dateRangeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 12,
+    padding: 14,
+    marginVertical: 12,
+  },
+  dateRangeItem:  { alignItems: 'center', flex: 1 },
+  dateRangeLabel: { color: '#E9D5FF', fontSize: 10, fontWeight: '600', textTransform: 'uppercase', marginBottom: 6 },
+  dateRangeDate:  { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  dateRangeTime:  { color: '#E9D5FF', fontSize: 11, marginTop: 3, fontWeight: '500' },
+  nightsBadge: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginHorizontal: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  nightsText:  { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
+  nightsLabel: { color: '#FFFFFF', fontSize: 9, fontWeight: '600', textTransform: 'uppercase', marginTop: 2 },
+  infoSection: { marginVertical: 12, gap: 8 },
+  infoRow:     { flexDirection: 'row', gap: 8 },
+  infoItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  infoItemFull: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  infoText: { color: '#1F2937', fontSize: 13, fontWeight: '600', flex: 1 },
+  paymentContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  paymentRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  balanceRow:   { marginTop: 6, paddingTop: 12, borderTopWidth: 1.5, borderTopColor: '#E5E7EB' },
+  paymentLabel: { color: '#6B7280', fontSize: 13, fontWeight: '600' },
+  paymentValue: { color: '#1F2937', fontSize: 14, fontWeight: '700' },
+  tapToViewContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1.5,
+    borderTopColor: '#E5E7EB',
+  },
+  tapToViewText: { color: '#6B5B95', fontSize: 13, fontWeight: '600' },
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalBackground: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  detailsContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  detailsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  detailsTitle:  { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
+  detailsScroll: { maxHeight: 500 },
+  detailsContent:{ padding: 24 },
+  detailsSection: {
+    marginBottom: 24,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  detailsSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#6B5B95',
+    marginBottom: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#E5E7EB',
+  },
+  detailsRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 10 },
+  detailsLabel:{ fontSize: 13, fontWeight: '600', color: '#6B7280', width: 100 },
+  detailsValue:{ fontSize: 13, fontWeight: '600', color: '#1F2937', flex: 1 },
+
+  // ── NEW: Method row inside modal ─────────────────────────────────────────
+  detailsMethodContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  detailsMethodImage: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+  },
+
+  detailsPaymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  detailsPaymentRowHighlight: {
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1.5,
+    borderTopColor: '#E5E7EB',
+  },
+  detailsPaymentLabel: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
+  detailsPaymentValue: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
+  detailsFooter: {
+    padding: 24,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  detailsActionButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#C9A965',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  detailsActionButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 10,
+  },
+  detailsActionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+});

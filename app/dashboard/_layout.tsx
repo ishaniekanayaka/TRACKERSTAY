@@ -60,7 +60,7 @@ const DashboardLayout = () => {
 
         {/* Bookings */}
         <Tabs.Screen
-          name="bookings"
+          name="booking-summary"
           options={{
             title: "Bookings",
             tabBarIcon: ({ color, focused }) => (

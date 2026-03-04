@@ -1,19 +1,3 @@
-// import api from "../config/apiConfig";
-
-// const homeService = {
-//   getDailyBookingDetails: async (date: string) => {
-//     try {
-//       const { data } = await api.get(`/hotel/daily-booking-details?date=${date}`);
-//       return data;
-//     } catch (error: any) {
-//       // Let the interceptor handle 401 errors
-//       throw error;
-//     }
-//   },
-// };
-
-// export default homeService;
-
 // services/homeService.ts
 import api from "../config/apiConfig";
 
@@ -86,20 +70,51 @@ export type BookingHistoryResponse = {
   history: BookingHistoryItem[];
 };
 
-const homeService = {
+// Helper to extract a user-friendly message from any error shape
+const parseErrorMessage = (error: any): string => {
+  // No internet / timeout
+  if (!error.response) {
+    if (error.code === 'ECONNABORTED') return 'Request timed out. Please check your connection and try again.';
+    return 'Unable to reach the server. Please check your internet connection.';
+  }
 
+  const status = error.response?.status;
+  const serverMessage =
+    error.response?.data?.message ||
+    error.response?.data?.error ||
+    error.response?.data?.msg ||
+    null;
+
+  switch (status) {
+    case 400: return serverMessage || 'Bad request. Please try again.';
+    case 401: return 'Session expired. Please log in again.';
+    case 403: return 'You do not have permission to access this data.';
+    case 404: return 'Requested data not found on the server.';
+    case 422: return serverMessage || 'Invalid data sent to the server.';
+    case 429: return 'Too many requests. Please wait a moment and try again.';
+    case 500: return 'Server error occurred. Please try again later.';
+    case 502:
+    case 503:
+    case 504: return 'Server is temporarily unavailable. Please try again shortly.';
+    default:  return serverMessage || `Unexpected error (${status}). Please try again.`;
+  }
+};
+
+
+
+const homeService = {
 
   getDailyBookingDetails: async (date: string) => {
     try {
       const { data } = await api.get(`/hotel/daily-booking-details?date=${date}`);
       return data;
     } catch (error: any) {
-      throw error;
+      // Re-throw a clean Error with a readable message so the UI can show it
+      throw new Error(parseErrorMessage(error));
     }
   },
 
   // Get Booking History
-  
 };
 
 export default homeService;

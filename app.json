@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "trackerstay",
+    "name": "tracker",
     "slug": "trackerstay",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -25,6 +25,10 @@
         "RECEIVE_BOOT_COMPLETED",
         "WAKE_LOCK",
         "VIBRATE",
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK",
+        "VIBRATE",
         "POST_NOTIFICATIONS"
       ]
     },
@@ -42,7 +46,10 @@
           "icon": "./assets/images/notification-icon.png",
           "color": "#ffffff",
           "defaultChannel": "default",
-          "mode": "production"
+          "mode": "production",
+          "sounds": [
+            "./assets/sounds/trackerstay_tone1.mp3"
+          ]
         }
       ],
       [
@@ -76,7 +83,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "090e95f8-5f76-4ece-a6ff-0ce737fef150"
+        "projectId": "6f31aa4b-3391-4811-b7be-7d2e47995e8a"
       }
     },
     "androidStatusBar": {

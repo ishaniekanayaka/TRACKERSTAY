@@ -53,10 +53,22 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       route: '/dashboard/home',
     },
     {
-      id: 'bookings',
-      title: 'Bookings',
+      id: 'booking-summary',
+      title: 'Booking Summary',
+      icon: 'list',
+      route: '/dashboard/booking-summary',
+    },
+    {
+      id: 'booking-calendar',
+      title: 'Booking Calendar',
       icon: 'calendar',
-      route: '/dashboard/bookings',
+      route: '/nav/booking_calendar',
+    },
+    {
+      id: 'bookings',
+      title: 'Notification',
+      icon: 'calendar',
+      route: '/nav/bookings',
     },
     {
       id: 'utility',
@@ -64,6 +76,14 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       icon: 'flash',
       route: '/dashboard/utility',
     },
+    {
+      id: 'housekeeping',      
+      title: 'Housekeeping',
+      icon: 'bed',
+      route: '/nav/house_keeping',
+    },
+    
+    
   ];
 
   useEffect(() => {
