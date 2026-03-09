@@ -29,6 +29,14 @@
         "RECEIVE_BOOT_COMPLETED",
         "WAKE_LOCK",
         "VIBRATE",
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK",
+        "VIBRATE",
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK",
+        "VIBRATE",
         "POST_NOTIFICATIONS"
       ]
     },
@@ -83,7 +91,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "6f31aa4b-3391-4811-b7be-7d2e47995e8a"
+        "projectId": "92238144-8983-42d2-8b18-eaca046c6144"
       }
     },
     "androidStatusBar": {
@@ -94,6 +102,12 @@
       "color": "#ffffff",
       "iosDisplayInForeground": true,
       "androidMode": "default"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f00de547-84d8-453a-b7ea-3acadee65628"
     }
   }
 }
