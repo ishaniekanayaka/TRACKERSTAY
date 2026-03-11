@@ -1,4 +1,4 @@
-import { Room, getRoomStatusColor, getTimeAgo } from '@/services/housekeepingService';
+import { getRoomChecklist, getRoomStatusColor, getTimeAgo, Room } from '@/services/housekeepingService';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -18,7 +18,8 @@ const C = {
 
 const RoomCard: React.FC<RoomCardProps> = ({ item, onOpenDotMenu }) => {
     const si = getRoomStatusColor(item);
-    const timeAgo = item.check_list?.updated_at ? getTimeAgo(item.check_list.updated_at) : null;
+    const checklist = getRoomChecklist(item);
+    const timeAgo = checklist?.updated_at ? getTimeAgo(checklist.updated_at) : null;
 
     return (
         <View style={[s.card, { borderColor: si.border, backgroundColor: si.bg }]}>
