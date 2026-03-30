@@ -91,6 +91,26 @@ const NewChecklistModal: React.FC<NewChecklistModalProps> = ({
             }))]);
     };
 
+    const takePhoto = async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+            return;
+        }
+        const res = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false, quality: 0.8,
+        });
+        if (!res.canceled && res.assets.length > 0) {
+            const a = res.assets[0];
+            setLocalImages(prev => [...prev, {
+                uri: a.uri,
+                name: a.fileName || `photo_${Date.now()}.jpg`,
+                type: a.mimeType || 'image/jpeg',
+            }]);
+        }
+    };
+
     const handleViewChecklist = () => {
         const unanswered = items.filter(i => answers[i.id] === null).length;
         if (unanswered > 0) {
@@ -218,7 +238,7 @@ const NewChecklistModal: React.FC<NewChecklistModalProps> = ({
                             </View>
 
                             <View style={[s.imageCard, { marginTop: 14 }]}>
-                                <LocalImageStrip images={localImages} onAdd={pickImage}
+                                <LocalImageStrip images={localImages} onCamera={takePhoto} onAdd={pickImage}
                                     onRemove={i => setLocalImages(prev => prev.filter((_, idx) => idx !== i))} />
                             </View>
                         </>
