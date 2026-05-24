@@ -43,6 +43,8 @@ export interface Room {
   updated_at?: string;
   room_category?: RoomCategory;
   check_list?: CheckList | null;
+  checklist?: CheckList | null;
+  latest_checklist?: CheckList | null;
   // Booking info injected from calendar API
   current_booking?: {
     booking_id: number;
@@ -377,6 +379,14 @@ export const resolveImageUrl = (img: ChecklistImage, baseUrl: string): string =>
 };
 
 /**
+ * Returns the latest checklist object from supported API field names.
+ */
+export const getRoomChecklist = (room: Room): CheckList | null => {
+  const r = room as Room & { checklist?: CheckList | null; latest_checklist?: CheckList | null };
+  return r.check_list ?? r.checklist ?? r.latest_checklist ?? null;
+};
+
+/**
  * Determines room status based on business logic:
  * 1. Occupied – guest currently staying in the room.
  * 2. Need to Clean – guest stays 3+ days without cleaning.
@@ -388,10 +398,12 @@ export const getRoomStatusColor = (room: Room): RoomStatusInfo => {
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
   const booking = room.current_booking ?? null;
+  const checklist = getRoomChecklist(room);
 
   // Case-insensitive status checks
-  const isStatus = (s: string, list: string[]) =>
-    list.includes(s.toLowerCase().replace(/[-_ ]/g, ''));
+  const normalize = (s?: string | null) => (s ?? '').toLowerCase().replace(/[-_ ]/g, '');
+  const isStatus = (s: string | undefined | null, list: string[]) =>
+    list.includes(normalize(s));
 
   // 1. Is Occupied? (Guest currently checked IN)
   const isOccupied = booking && isStatus(booking.status, ['checkedin', 'checkin', 'active', 'inhouse']) &&
@@ -400,12 +412,17 @@ export const getRoomStatusColor = (room: Room): RoomStatusInfo => {
   // Is Checked Out?
   const guestCheckedOut = booking && isStatus(booking.status, ['checkedout', 'checkout', 'departed']);
 
-  const lastCheckedAt = room.check_list?.updated_at ?? null;
+  const lastCheckedAt = checklist?.updated_at ?? checklist?.created_at ?? null;
   const lastCheckedDate = lastCheckedAt ? new Date(lastCheckedAt) : null;
   const hoursSinceClean = lastCheckedDate ? (now.getTime() - lastCheckedDate.getTime()) / 3600000 : Infinity;
+  const roomStatusNorm = normalize(checklist?.room_status);
+  const checklistStatusNorm = normalize(checklist?.status);
+  const isChecklistChecked = ['checked', 'finalized', 'completed', 'done', 'approved'].includes(checklistStatusNorm);
+  const isRoomReady = roomStatusNorm === 'ready';
+  const isRoomNotReady = roomStatusNorm === 'notready';
 
   // 4. Clean — finalized within last 24h
-  const isRecentlyCleaned = room.check_list?.status === 'Checked' && hoursSinceClean <= 24;
+  const isRecentlyCleaned = (isChecklistChecked || isRoomReady) && hoursSinceClean <= 24;
 
   // Priority 1 & 2: Occupied / Need to Clean
   if (isOccupied) {
@@ -421,14 +438,19 @@ export const getRoomStatusColor = (room: Room): RoomStatusInfo => {
   }
 
   // 3. Dirty — guest checked out OR specifically marked as Not Ready (if not recently cleaned)
-  if (guestCheckedOut || (room.check_list?.room_status === 'Not Ready' && !isRecentlyCleaned)) {
+  if (guestCheckedOut || (isRoomNotReady && !isRecentlyCleaned)) {
     // If it was cleaned AFTER checkout, it shouldn't be dirty unless marked Not Ready
     const checkoutDate = booking ? new Date(booking.end_date) : null;
     const cleanedAfterCheckout = lastCheckedDate && checkoutDate && lastCheckedDate > checkoutDate;
 
-    if (!cleanedAfterCheckout || room.check_list?.room_status === 'Not Ready') {
+    if (!cleanedAfterCheckout || isRoomNotReady) {
       return { color: '#EF4444', label: 'Dirty', bg: '#FEE2E2', border: '#FCA5A5' };
     }
+  }
+
+  // If backend marks it as ready but timestamp is missing, trust the explicit status.
+  if (isRoomReady && !lastCheckedDate) {
+    return { color: '#10B981', label: 'Clean', bg: '#D1FAE5', border: '#6EE7B7' };
   }
 
   // 4. Clean
@@ -437,7 +459,7 @@ export const getRoomStatusColor = (room: Room): RoomStatusInfo => {
   }
 
   // 5. Need to Touch Up — cleaned but >24h ago, no current guest
-  if (room.check_list?.status === 'Checked' && hoursSinceClean > 24) {
+  if ((isChecklistChecked || isRoomReady) && hoursSinceClean > 24) {
     return { color: '#F59E0B', label: 'Need to Touch Up', bg: '#FEF3C7', border: '#FDE68A' };
   }
 

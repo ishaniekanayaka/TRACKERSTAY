@@ -11,6 +11,7 @@ export interface LocalImage {
 interface LocalImageStripProps {
     images: LocalImage[];
     onAdd: () => void;
+    onCamera?: () => void;
     onRemove: (index: number) => void;
 }
 
@@ -19,16 +20,22 @@ const C = {
     red: '#EF4444',
 };
 
-const LocalImageStrip: React.FC<LocalImageStripProps> = ({ images, onAdd, onRemove }) => (
+const LocalImageStrip: React.FC<LocalImageStripProps> = ({ images, onAdd, onCamera, onRemove }) => (
     <View>
         <View style={s.imgHeader}>
             <Ionicons name="camera-outline" size={16} color={C.purple} />
             <Text style={s.imgTitle}>Add Photos</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {onCamera && (
+                <TouchableOpacity onPress={onCamera} style={[s.addPhotoBtn, { marginRight: 8 }]} activeOpacity={0.75}>
+                    <Ionicons name="camera" size={24} color={C.purple} />
+                    <Text style={s.addPhotoText}>Camera</Text>
+                </TouchableOpacity>
+            )}
             <TouchableOpacity onPress={onAdd} style={s.addPhotoBtn} activeOpacity={0.75}>
-                <Ionicons name="add" size={26} color={C.purple} />
-                <Text style={s.addPhotoText}>Add</Text>
+                <Ionicons name="image-outline" size={24} color={C.purple} />
+                <Text style={s.addPhotoText}>Gallery</Text>
             </TouchableOpacity>
             {images.map((img, idx) => (
                 <View key={idx} style={[s.thumbWrap, { marginLeft: 8 }]}>
