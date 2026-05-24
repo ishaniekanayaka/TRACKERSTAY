@@ -1,5 +1,4 @@
-// // app/dashboard/index.tsx
-// import React, { useState, useEffect, useRef, useCallback } from 'react';
+// import React, { useState, useEffect, useRef } from 'react';
 // import {
 //   StyleSheet,
 //   Text,
@@ -13,56 +12,73 @@
 //   Animated,
 //   ScrollView,
 //   Dimensions,
+//   Image,
 // } from 'react-native';
 // import { Ionicons } from '@expo/vector-icons';
 // import { LinearGradient } from 'expo-linear-gradient';
 // import DateTimePicker from '@react-native-community/datetimepicker';
-// import { useRouter } from "expo-router";
+// import { useRouter } from 'expo-router';
 // import { useNotification } from '@/context/NotificationContext';
 // import homeService from '../../services/homeService';
-// import { logout, getCurrentUser } from '../../services/authService';
 // import { TabType, Booking, BookingData, PaymentInfo, StatusStyle } from './../../types/booking';
-// import { NotificationItem } from './../../types/notification';
 // import HeaderWithMenu from '../../components/HeaderWithMenu';
 
 // const { width } = Dimensions.get('window');
 
-// interface UserData {
-//   id: number;
-//   name: string;
-//   email: string;
-//   lname: string;
-//   status: string;
-//   role: string;
-//   hotel_chain_id: number;
-//   hotel_id: number;
-//   hotel: {
-//     id: number;
-//     hotel_name: string;
-//     hotel_chain_id: number;
-//   };
-// }
+// // ── Booking Method → Image Map ────────────────────────────────────────────────
+// const BOOKING_METHOD_IMAGES: Record<string, any> = {
+//   airbnb:      require('../../assets/adult/airbnb.png'),
+//   'air bnb':   require('../../assets/adult/airbnb.png'),
+//   booking:     require('../../assets/adult/booking.png'),
+//   'booking.com': require('../../assets/adult/booking.png'),
+//   agoda:       require('../../assets/adult/agoda.png'),
+//   expedia:     require('../../assets/adult/expedia.png'),
+//   online:      require('../../assets/adult/online.png'),
+//   agency:      require('../../assets/adult/agency.png'),
+//   ai:          require('../../assets/adult/Ai.png'),
+//   download:    require('../../assets/adult/download.png'),
+//   ravan:       require('../../assets/adult/ravan.png'),
+//   walking:     require('../../assets/adult/walking.png'),
+//   'walk in':   require('../../assets/adult/walking.png'),
+//   walkin:      require('../../assets/adult/walking.png'),
+//   phone:       require('../../assets/adult/phone.png'),
+//   no:          require('../../assets/adult/no.png'),
+//   direct:      require('../../assets/adult/a.png'),
+// };
+
+// /**
+//  * Returns the local image asset for a given booking method string.
+//  * Falls back to null if no match found.
+//  */
+// const getBookingMethodImage = (method: string | null | undefined) => {
+//   if (!method) return null;
+//   const key = method.toLowerCase().trim();
+//   // Exact match first
+//   if (BOOKING_METHOD_IMAGES[key]) return BOOKING_METHOD_IMAGES[key];
+//   // Partial match
+//   for (const [k, v] of Object.entries(BOOKING_METHOD_IMAGES)) {
+//     if (key.includes(k) || k.includes(key)) return v;
+//   }
+//   return null;
+// };
 
 // const Home = () => {
 //   const router = useRouter();
-//   const { 
-//     notifications, 
-//     unseenCount 
-//   } = useNotification();
-  
-//   const [activeTab, setActiveTab] = useState<TabType>('arrivals');
-//   const [selectedDate, setSelectedDate] = useState(
-//     new Date().toISOString().split('T')[0]
-//   );
+//   const { notifications, unseenCount } = useNotification();
+
+//   const [activeTab, setActiveTab]           = useState<TabType>('arrivals');
+//   const [selectedDate, setSelectedDate]     = useState(new Date().toISOString().split('T')[0]);
 //   const [showDatePicker, setShowDatePicker] = useState(false);
-//   const [bookingData, setBookingData] = useState<BookingData | null>(null);
-//   const [loading, setLoading] = useState(false);
-//   const [refreshing, setRefreshing] = useState(false);
+//   const [bookingData, setBookingData]       = useState<BookingData | null>(null);
+//   const [loading, setLoading]               = useState(false);
+//   const [refreshing, setRefreshing]         = useState(false);
 //   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 //   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
+//   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
 //   const detailsSlideAnim = useRef(new Animated.Value(0)).current;
-//   const detailsFadeAnim = useRef(new Animated.Value(0)).current;
+//   const detailsFadeAnim  = useRef(new Animated.Value(0)).current;
 
 //   useEffect(() => {
 //     loadBookingDetails();
@@ -102,17 +118,36 @@
 //   const loadBookingDetails = async () => {
 //     try {
 //       setLoading(true);
+//       setErrorMessage(null);
+
 //       const response = await homeService.getDailyBookingDetails(selectedDate);
 //       console.log('API Response:', response);
-      
+
 //       if (response && response.details) {
 //         setBookingData(response);
 //       } else {
-//         Alert.alert('Error', 'Invalid response format');
+//         setErrorMessage('Received an unexpected response from the server. Please try again.');
+//         setBookingData(null);
 //       }
 //     } catch (error) {
 //       console.error('Error loading bookings:', error);
-//       Alert.alert('Error', error instanceof Error ? error.message : 'An error occurred');
+//       const msg =
+//         error instanceof Error
+//           ? error.message
+//           : 'Something went wrong. Please try again.';
+
+//       setErrorMessage(msg);
+//       setBookingData(null);
+
+//       Alert.alert(
+//         'Connection Problem',
+//         msg,
+//         [
+//           { text: 'Retry', onPress: () => loadBookingDetails() },
+//           { text: 'OK', style: 'cancel' },
+//         ],
+//         { cancelable: true }
+//       );
 //     } finally {
 //       setLoading(false);
 //       setRefreshing(false);
@@ -126,18 +161,23 @@
 
 //   const getCurrentBookings = (): Booking[] => {
 //     if (!bookingData || !bookingData.details) return [];
-    
-//     const bookings = bookingData.details[activeTab] || [];
-//     console.log(`${activeTab} bookings:`, bookings);
-//     return bookings;
+//     return bookingData.details[activeTab] || [];
+//   };
+
+//   const getTotalRoomsForTab = (tab: TabType): number => {
+//     if (!bookingData || !bookingData.details) return 0;
+//     const bookings: Booking[] = bookingData.details[tab] || [];
+//     return bookings.reduce((total, booking) => {
+//       const roomCount = parseInt(String(booking.room_count || '1'), 10);
+//       return total + (isNaN(roomCount) ? 1 : roomCount);
+//     }, 0);
 //   };
 
 //   const calculateNights = (checkIn: string, checkOut: string): number => {
-//     const start = new Date(checkIn);
-//     const end = new Date(checkOut);
+//     const start    = new Date(checkIn);
+//     const end      = new Date(checkOut);
 //     const diffTime = Math.abs(end.getTime() - start.getTime());
-//     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-//     return diffDays;
+//     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 //   };
 
 //   const getRoomInfo = (booking: Booking): string => {
@@ -145,31 +185,33 @@
 //       const roomNames = booking.booking_room_count
 //         .filter((room: any) => room.room_count > 0)
 //         .map((room: any) => {
-//           const roomType = room.room_categories?.room_type || room.room_categories?.category || 'Room';
+//           const roomType =
+//             room.room_categories?.room_type ||
+//             room.room_categories?.category ||
+//             'Room';
 //           return `${roomType} (${room.room_count})`;
 //         });
-//       return roomNames.length > 0 ? roomNames.join(', ') : `${booking.room_count} Room${booking.room_count > 1 ? 's' : ''}`;
+//       return roomNames.length > 0
+//         ? roomNames.join(', ')
+//         : `${booking.room_count} Room${booking.room_count > 1 ? 's' : ''}`;
 //     }
 //     return `${booking.room_count} Room${booking.room_count > 1 ? 's' : ''}`;
 //   };
 
 //   const getPaymentInfo = (booking: Booking): PaymentInfo => {
 //     const total = booking.total_amount || 0;
-    
+   
 //     if (booking.reservation) {
 //       const advancePayment = parseFloat(booking.reservation.advance_payment || '0');
-//       const balance = parseFloat(booking.reservation.balance || '0');
-      
 //       return {
-//         total: total.toFixed(2),
-//         paid: advancePayment.toFixed(2),
+//         total:   total.toFixed(2),
+//         paid:    advancePayment.toFixed(2),
 //         balance: (total - advancePayment).toFixed(2),
 //       };
 //     }
-    
 //     return {
-//       total: total.toFixed(2),
-//       paid: '0.00',
+//       total:   total.toFixed(2),
+//       paid:     '0.00',
 //       balance: total.toFixed(2),
 //     };
 //   };
@@ -181,44 +223,12 @@
 
 //   const handleDateChange = (event: any, date?: Date) => {
 //     setShowDatePicker(false);
-//     if (date) {
-//       setSelectedDate(date.toISOString().split('T')[0]);
-//     }
+//     if (date) setSelectedDate(date.toISOString().split('T')[0]);
 //   };
 
-//   const renderStatCard = (
-//     icon: any,
-//     label: string,
-//     value: number,
-//     iconColor: string,
-//     tab: TabType
-//   ) => (
-//     <TouchableOpacity 
-//       onPress={() => setActiveTab(tab)}
-//       activeOpacity={0.7}
-//       style={s.statCardContainer}
-//     >
-//       <View style={[s.statCard, activeTab === tab && s.activeStatCard]}>
-//         <View style={[s.statIconContainer, { backgroundColor: iconColor }]}>
-//           <Ionicons name={icon} size={24} color="#FFFFFF" />
-//         </View>
-//         <View style={s.statTextContainer}>
-//           <Text style={s.statValue}>{value}</Text>
-//           <Text style={s.statLabel}>{label}</Text>
-//         </View>
-//         {activeTab === tab && (
-//           <View style={s.activeIndicator}>
-//             <View style={[s.activeDot, { backgroundColor: iconColor }]} />
-//           </View>
-//         )}
-//       </View>
-//     </TouchableOpacity>
-//   );
-
 //   const getStatusStyle = (booking: Booking): StatusStyle => {
-//     const status = booking.checking_status || booking.status || '';
+//     const status      = booking.checking_status || booking.status || '';
 //     const statusLower = status.toLowerCase();
-    
 //     switch (statusLower) {
 //       case 'checkin':
 //       case 'checked-in':
@@ -237,29 +247,111 @@
 //     }
 //   };
 
+//   // ── Error Banner ──────────────────────────────────────────────────────────
+//   const renderErrorBanner = () => {
+//     if (!errorMessage) return null;
+//     return (
+//       <View style={s.errorBanner}>
+//         <View style={s.errorBannerInner}>
+//           <Ionicons name="cloud-offline-outline" size={30} color="#EF4444" />
+//           <View style={s.errorTextContainer}>
+//             <Text style={s.errorTitle}>Failed to Load Data</Text>
+//             <Text style={s.errorSubtitle}>{errorMessage}</Text>
+//           </View>
+//         </View>
+//         <TouchableOpacity style={s.retryButton} onPress={loadBookingDetails}>
+//           <Ionicons name="refresh-outline" size={15} color="#FFFFFF" />
+//           <Text style={s.retryButtonText}>Retry</Text>
+//         </TouchableOpacity>
+//       </View>
+//     );
+//   };
+
+//   // ── Stat Card ────────────────────────────────────────────────────────────
+//   const renderStatCard = (
+//     icon: any,
+//     label: string,
+//     guestCount: number,
+//     iconColor: string,
+//     tab: TabType
+//   ) => {
+//     const roomCount = bookingData ? getTotalRoomsForTab(tab) : 0;
+
+//     return (
+//       <TouchableOpacity
+//         onPress={() => setActiveTab(tab)}
+//         activeOpacity={0.7}
+//         style={s.statCardContainer}
+//       >
+//         <View style={[s.statCard, activeTab === tab && s.activeStatCard]}>
+//           <View style={[s.statIconContainer, { backgroundColor: iconColor }]}>
+//             <Ionicons name={icon} size={22} color="#FFFFFF" />
+//           </View>
+//           <View style={s.statTextContainer}>
+//             <Text style={s.statValue}>{guestCount}</Text>
+//             <Text style={s.statLabel}>{label}</Text>
+//             <View style={s.roomCountBadge}>
+//               <Ionicons name="home-outline" size={10} color="#6B5B95" />
+//               <Text style={s.roomCountText}>Rooms: {roomCount}</Text>
+//             </View>
+//           </View>
+//           {activeTab === tab && (
+//             <View style={s.activeIndicator}>
+//               <View style={[s.activeDot, { backgroundColor: iconColor }]} />
+//             </View>
+//           )}
+//         </View>
+//       </TouchableOpacity>
+//     );
+//   };
+
+//   // ── Booking Method Badge (with image) ────────────────────────────────────
+//   const renderBookingMethodBadge = (bookingMethod: string | null | undefined) => {
+//     if (!bookingMethod) return null;
+//     const methodImage = getBookingMethodImage(bookingMethod);
+
+//     return (
+//       <View style={s.bookingMethodBadge}>
+//         {methodImage ? (
+//           <Image
+//             source={methodImage}
+//             style={s.bookingMethodImage}
+//             resizeMode="contain"
+//           />
+//         ) : (
+//           <Ionicons name="globe-outline" size={16} color="#6B5B95" />
+//         )}
+//         <Text style={s.bookingMethodText}>{bookingMethod}</Text>
+//       </View>
+//     );
+//   };
+
+//   // ── Booking Card ──────────────────────────────────────────────────────────
 //   const renderBookingCard = ({ item }: { item: Booking }) => {
 //     const statusStyle = getStatusStyle(item);
-//     const nights = calculateNights(item.checking_date, item.checkout_date);
-//     const roomInfo = getRoomInfo(item);
+//     const nights      = calculateNights(item.checking_date, item.checkout_date);
+//     const roomInfo    = getRoomInfo(item);
 //     const paymentInfo = getPaymentInfo(item);
-//     const guestName = `${item.first_name} ${item.last_name}`.trim();
-    
+//     const guestName   = `${item.first_name} ${item.last_name}`.trim();
+
 //     return (
-//       <TouchableOpacity 
-//         onPress={() => handleViewBooking(item)}
-//         activeOpacity={0.9}
-//       >
+//       <TouchableOpacity onPress={() => handleViewBooking(item)} activeOpacity={0.9}>
 //         <View style={s.bookingCard}>
+//           {/* ── Header: booking method image (left) + name & status (right) ── */}
 //           <View style={s.bookingHeader}>
+//             {/* Booking method image on top-left */}
+//             {renderBookingMethodBadge(item.booking_method)}
 //             <View style={s.bookingHeaderLeft}>
 //               <Text style={s.bookingName}>{guestName}</Text>
-//               <View style={[s.statusBadge, { 
-//                 backgroundColor: statusStyle.backgroundColor, 
-//                 borderColor: statusStyle.borderColor 
-//               }]}>
-//                 <Text style={[s.statusText, { color: statusStyle.textColor }]}>
-//                   {item.checking_status || item.status}
-//                 </Text>
+//               <View style={s.bookingHeaderMeta}>
+//                 <View style={[s.statusBadge, {
+//                   backgroundColor: statusStyle.backgroundColor,
+//                   borderColor: statusStyle.borderColor,
+//                 }]}>
+//                   <Text style={[s.statusText, { color: statusStyle.textColor }]}>
+//                     {item.checking_status || item.status}
+//                   </Text>
+//                 </View>
 //               </View>
 //             </View>
 //           </View>
@@ -273,7 +365,7 @@
 //             </View>
 //           )}
 
-//           <LinearGradient 
+//           <LinearGradient
 //             colors={['#6B5B95', '#7D6BA8']}
 //             start={{ x: 0, y: 0 }}
 //             end={{ x: 1, y: 0 }}
@@ -301,8 +393,11 @@
 //                 <Ionicons name="bed-outline" size={16} color="#6B5B95" />
 //                 <Text style={s.infoText}>{roomInfo}</Text>
 //               </View>
+//               <View style={s.infoItemFull}>
+//                 <Ionicons name="home-outline" size={16} color="#6B5B95" />
+//                 <Text style={s.infoText}>{item.room_count || 1} Rooms</Text>
+//               </View>
 //             </View>
-
 //             <View style={s.infoRow}>
 //               <View style={s.infoItem}>
 //                 <Ionicons name="person-outline" size={16} color="#6B5B95" />
@@ -313,7 +408,6 @@
 //                 <Text style={s.infoText}>{item.children} Children</Text>
 //               </View>
 //             </View>
-
 //             <View style={s.infoRow}>
 //               <View style={s.infoItemFull}>
 //                 <Ionicons name="restaurant-outline" size={16} color="#6B5B95" />
@@ -331,6 +425,7 @@
 //               <Text style={[s.paymentLabel, { color: '#10B981' }]}>Paid</Text>
 //               <Text style={[s.paymentValue, { color: '#10B981' }]}>LKR {paymentInfo.paid}</Text>
 //             </View>
+        
 //             <View style={[s.paymentRow, s.balanceRow]}>
 //               <Text style={[s.paymentLabel, { color: '#EF4444', fontWeight: '700' }]}>Balance Due</Text>
 //               <Text style={[s.paymentValue, { color: '#EF4444', fontWeight: '700' }]}>LKR {paymentInfo.balance}</Text>
@@ -346,17 +441,19 @@
 //     );
 //   };
 
+//   // ── Details Modal ─────────────────────────────────────────────────────────
 //   const renderDetailsModal = () => {
 //     if (!selectedBooking) return null;
 
 //     const statusStyle = getStatusStyle(selectedBooking);
-//     const nights = calculateNights(selectedBooking.checking_date, selectedBooking.checkout_date);
-//     const roomInfo = getRoomInfo(selectedBooking);
+//     const nights      = calculateNights(selectedBooking.checking_date, selectedBooking.checkout_date);
+//     const roomInfo    = getRoomInfo(selectedBooking);
 //     const paymentInfo = getPaymentInfo(selectedBooking);
-//     const guestName = `${selectedBooking.first_name} ${selectedBooking.last_name}`.trim();
-    
+//     const guestName   = `${selectedBooking.first_name} ${selectedBooking.last_name}`.trim();
+//     const methodImage = getBookingMethodImage(selectedBooking.booking_method);
+
 //     const detailsSlideUpTranslate = detailsSlideAnim.interpolate({
-//       inputRange: [0, 1],
+//       inputRange:  [0, 1],
 //       outputRange: [600, 0],
 //     });
 
@@ -368,18 +465,13 @@
 //         onRequestClose={() => setShowDetailsModal(false)}
 //       >
 //         <Animated.View style={[s.modalOverlay, { opacity: detailsFadeAnim }]}>
-//           <TouchableOpacity 
-//             style={s.modalBackground} 
-//             activeOpacity={1} 
+//           <TouchableOpacity
+//             style={s.modalBackground}
+//             activeOpacity={1}
 //             onPress={() => setShowDetailsModal(false)}
 //           />
 //           <Animated.View
-//             style={[
-//               s.detailsContainer,
-//               {
-//                 transform: [{ translateY: detailsSlideUpTranslate }],
-//               },
-//             ]}
+//             style={[s.detailsContainer, { transform: [{ translateY: detailsSlideUpTranslate }] }]}
 //           >
 //             <LinearGradient colors={['#6B5B95', '#7D6BA8']} style={s.detailsHeader}>
 //               <Text style={s.detailsTitle}>Booking Details</Text>
@@ -390,6 +482,8 @@
 
 //             <ScrollView style={s.detailsScroll}>
 //               <View style={s.detailsContent}>
+
+//                 {/* Guest Info */}
 //                 <View style={s.detailsSection}>
 //                   <Text style={s.detailsSectionTitle}>Guest Information</Text>
 //                   <View style={s.detailsRow}>
@@ -427,6 +521,7 @@
 //                   )}
 //                 </View>
 
+//                 {/* Booking Info */}
 //                 <View style={s.detailsSection}>
 //                   <Text style={s.detailsSectionTitle}>Booking Information</Text>
 //                   <View style={s.detailsRow}>
@@ -464,20 +559,30 @@
 //                     <Text style={s.detailsLabel}>Meal:</Text>
 //                     <Text style={s.detailsValue}>{selectedBooking.breakfast || 'No Meal'}</Text>
 //                   </View>
+//                   {/* ── Booking Method with image ── */}
 //                   {selectedBooking.booking_method && (
 //                     <View style={s.detailsRow}>
 //                       <Ionicons name="briefcase" size={18} color="#6B5B95" />
 //                       <Text style={s.detailsLabel}>Method:</Text>
-//                       <Text style={s.detailsValue}>{selectedBooking.booking_method}</Text>
+//                       <View style={s.detailsMethodContainer}>
+//                         {methodImage && (
+//                           <Image
+//                             source={methodImage}
+//                             style={s.detailsMethodImage}
+//                             resizeMode="contain"
+//                           />
+//                         )}
+//                         <Text style={s.detailsValue}>{selectedBooking.booking_method}</Text>
+//                       </View>
 //                     </View>
 //                   )}
 //                   <View style={s.detailsRow}>
 //                     <Ionicons name="information-circle" size={18} color="#6B5B95" />
 //                     <Text style={s.detailsLabel}>Status:</Text>
-//                     <View style={[s.statusBadge, { 
-//                       backgroundColor: statusStyle.backgroundColor, 
+//                     <View style={[s.statusBadge, {
+//                       backgroundColor: statusStyle.backgroundColor,
 //                       borderColor: statusStyle.borderColor,
-//                       marginLeft: 'auto'
+//                       marginLeft: 'auto',
 //                     }]}>
 //                       <Text style={[s.statusText, { color: statusStyle.textColor }]}>
 //                         {selectedBooking.checking_status || selectedBooking.status}
@@ -486,6 +591,7 @@
 //                   </View>
 //                 </View>
 
+//                 {/* Payment Info */}
 //                 <View style={s.detailsSection}>
 //                   <Text style={s.detailsSectionTitle}>Payment Information</Text>
 //                   <View style={s.detailsPaymentRow}>
@@ -501,6 +607,7 @@
 //                     <Text style={[s.detailsPaymentValue, { color: '#EF4444', fontWeight: '700' }]}>LKR {paymentInfo.balance}</Text>
 //                   </View>
 //                 </View>
+
 //               </View>
 //             </ScrollView>
 
@@ -522,8 +629,7 @@
 
 //   return (
 //     <View style={s.container}>
-//       {/* Header - Using Common Component */}
-//       <HeaderWithMenu 
+//       <HeaderWithMenu
 //         title="Dashboard"
 //         subtitle="Welcome back! Manage your bookings efficiently"
 //         showNotification={true}
@@ -540,7 +646,7 @@
 //             style={s.datePicker}
 //           />
 //         )}
-        
+
 //         {loading ? (
 //           <View style={s.loadingContainer}>
 //             <ActivityIndicator size="large" color="#6B5B95" />
@@ -550,9 +656,11 @@
 //           <FlatList
 //             ListHeaderComponent={
 //               <>
-//                 {/* Date Picker Section */}
+//                 {renderErrorBanner()}
+
+//                 {/* Date Picker */}
 //                 <View style={s.datePickerContainer}>
-//                   <TouchableOpacity 
+//                   <TouchableOpacity
 //                     onPress={() => setShowDatePicker(true)}
 //                     style={s.datePickerButton}
 //                     activeOpacity={0.8}
@@ -576,43 +684,43 @@
 //                 {bookingData && bookingData.summary && (
 //                   <View style={s.statsContainer}>
 //                     <View style={s.statsGrid}>
-//                       {renderStatCard('log-in-outline', 'Arrivals', bookingData.summary.arrivals_count, '#6B5B95', 'arrivals')}
+//                       {renderStatCard('log-in-outline',  'Arrivals',   bookingData.summary.arrivals_count,   '#6B5B95', 'arrivals')}
 //                       {renderStatCard('log-out-outline', 'Departures', bookingData.summary.departures_count, '#C9A965', 'departures')}
-//                       {renderStatCard('home-outline', 'In-House', bookingData.summary.in_house_count, '#8B7BA8', 'in_house')}
-//                       {renderStatCard('time-outline', 'All Active', bookingData.summary.pending_count, '#9C8AAD', 'pending')}
+//                       {renderStatCard('home-outline',    'In-House',   bookingData.summary.in_house_count,   '#8B7BA8', 'in_house')}
+//                       {renderStatCard('time-outline',    'All Active', bookingData.summary.pending_count,    '#9C8AAD', 'pending')}
 //                     </View>
 //                   </View>
 //                 )}
 
-//                 {/* Current Tab Display */}
-//                 <View style={s.currentTabContainer}>
-//                   <View style={s.currentTabBadge}>
-//                     <Ionicons 
-//                       name={
-//                         activeTab === 'arrivals' ? 'log-in-outline' :
-//                         activeTab === 'departures' ? 'log-out-outline' :
-//                         activeTab === 'in_house' ? 'home-outline' : 'time-outline'
-//                       } 
-//                       size={18} 
-//                       color="#6B5B95" 
-//                     />
-//                     <Text style={s.currentTabText}>
-//                       {activeTab === 'arrivals' ? 'Arrivals' :
-//                        activeTab === 'departures' ? 'Departures' :
-//                        activeTab === 'in_house' ? 'In-House Guests' : 'All Active Bookings'}
-//                     </Text>
-//                     <View style={s.currentTabCount}>
-//                       <Text style={s.currentTabCountText}>
-//                         {bookingData ? 
-//                           activeTab === 'arrivals' ? bookingData.summary.arrivals_count :
-//                           activeTab === 'departures' ? bookingData.summary.departures_count :
-//                           activeTab === 'in_house' ? bookingData.summary.in_house_count :
-//                           bookingData.summary.pending_count : 0
+//                 {/* Active Tab Badge */}
+//                 {bookingData && (
+//                   <View style={s.currentTabContainer}>
+//                     <View style={s.currentTabBadge}>
+//                       <Ionicons
+//                         name={
+//                           activeTab === 'arrivals'   ? 'log-in-outline' :
+//                           activeTab === 'departures' ? 'log-out-outline' :
+//                           activeTab === 'in_house'   ? 'home-outline' : 'time-outline'
 //                         }
+//                         size={18}
+//                         color="#6B5B95"
+//                       />
+//                       <Text style={s.currentTabText}>
+//                         {activeTab === 'arrivals'   ? 'Arrivals' :
+//                          activeTab === 'departures' ? 'Departures' :
+//                          activeTab === 'in_house'   ? 'In-House Guests' : 'All Active Bookings'}
 //                       </Text>
+//                       <View style={s.currentTabCount}>
+//                         <Text style={s.currentTabCountText}>
+//                           {activeTab === 'arrivals'   ? bookingData.summary.arrivals_count :
+//                            activeTab === 'departures' ? bookingData.summary.departures_count :
+//                            activeTab === 'in_house'   ? bookingData.summary.in_house_count :
+//                            bookingData.summary.pending_count}
+//                         </Text>
+//                       </View>
 //                     </View>
 //                   </View>
-//                 </View>
+//                 )}
 //               </>
 //             }
 //             data={currentBookings}
@@ -628,13 +736,15 @@
 //               />
 //             }
 //             ListEmptyComponent={
-//               <View style={s.emptyContainer}>
-//                 <Ionicons name="calendar-outline" size={60} color="#6B5B95" />
-//                 <Text style={s.emptyText}>No Bookings Found</Text>
-//                 <Text style={s.emptySubtext}>
-//                   No {activeTab.replace('_', ' ')} for this date
-//                 </Text>
-//               </View>
+//               !errorMessage ? (
+//                 <View style={s.emptyContainer}>
+//                   <Ionicons name="calendar-outline" size={60} color="#6B5B95" />
+//                   <Text style={s.emptyText}>No Bookings Found</Text>
+//                   <Text style={s.emptySubtext}>
+//                     No {activeTab.replace('_', ' ')} for this date
+//                   </Text>
+//                 </View>
+//               ) : null
 //             }
 //             extraData={activeTab}
 //           />
@@ -648,17 +758,55 @@
 
 // export default Home;
 
+// // ── Styles ────────────────────────────────────────────────────────────────────
 // const s = StyleSheet.create({
-//   container: { 
-//     flex: 1,
-//     backgroundColor: '#F5F5F5',
+//   container:        { flex: 1, backgroundColor: '#F5F5F5' },
+//   contentContainer: { flex: 1, backgroundColor: '#F5F5F5' },
+
+//   // Error Banner
+//   errorBanner: {
+//     marginHorizontal: 16,
+//     marginTop: 16,
+//     backgroundColor: '#FEF2F2',
+//     borderRadius: 14,
+//     borderWidth: 1.5,
+//     borderColor: '#FECACA',
+//     padding: 16,
+//     gap: 12,
 //   },
-//   contentContainer: {
-//     flex: 1,
-//     backgroundColor: '#F5F5F5',
+//   errorBannerInner: {
+//     flexDirection: 'row',
+//     alignItems: 'flex-start',
+//     gap: 12,
 //   },
-  
-//   // Date Picker Styles
+//   errorTextContainer: { flex: 1 },
+//   errorTitle: {
+//     fontSize: 14,
+//     fontWeight: '700',
+//     color: '#DC2626',
+//     marginBottom: 4,
+//   },
+//   errorSubtitle: {
+//     fontSize: 13,
+//     color: '#EF4444',
+//     lineHeight: 18,
+//   },
+//   retryButton: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     justifyContent: 'center',
+//     gap: 6,
+//     backgroundColor: '#EF4444',
+//     paddingVertical: 10,
+//     borderRadius: 10,
+//   },
+//   retryButtonText: {
+//     color: '#FFFFFF',
+//     fontSize: 14,
+//     fontWeight: '700',
+//   },
+
+//   // Date Picker
 //   datePickerContainer: { paddingHorizontal: 16, marginVertical: 16 },
 //   datePickerButton: {
 //     borderRadius: 12,
@@ -684,33 +832,25 @@
 //     flex: 1,
 //     marginLeft: 10,
 //   },
-//   datePicker: {
-//     backgroundColor: '#FFFFFF',
-//   },
-  
-//   // Stats Grid Styles
-//   statsContainer: { paddingHorizontal: 16, marginBottom: 16 },
-//   statsGrid: {
-//     flexDirection: 'row',
-//     flexWrap: 'wrap',
-//     gap: 12,
-//   },
-//   statCardContainer: {
-//     width: '48%',
-//   },
+//   datePicker: { backgroundColor: '#FFFFFF' },
+
+//   // Stats Grid
+//   statsContainer:    { paddingHorizontal: 16, marginBottom: 16 },
+//   statsGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+//   statCardContainer: { width: '48%' },
 //   statCard: {
 //     backgroundColor: '#FFFFFF',
 //     borderRadius: 16,
-//     padding: 16,
+//     padding: 14,
 //     flexDirection: 'row',
 //     alignItems: 'center',
-//     gap: 12,
+//     gap: 10,
 //     shadowColor: '#000',
 //     shadowOffset: { width: 0, height: 2 },
 //     shadowOpacity: 0.08,
 //     shadowRadius: 8,
 //     elevation: 3,
-//     minHeight: 85,
+//     minHeight: 90,
 //     position: 'relative',
 //     borderWidth: 2,
 //     borderColor: 'transparent',
@@ -724,31 +864,40 @@
 //     elevation: 6,
 //   },
 //   statIconContainer: {
-//     width: 44,
-//     height: 44,
+//     width: 42,
+//     height: 42,
 //     borderRadius: 12,
 //     justifyContent: 'center',
 //     alignItems: 'center',
 //   },
 //   statTextContainer: { flex: 1 },
-//   statValue: { color: '#1F2937', fontSize: 22, fontWeight: '700' },
-//   statLabel: { color: '#6B7280', fontSize: 12, marginTop: 2, fontWeight: '500' },
-//   activeIndicator: {
-//     position: 'absolute',
-//     top: 10,
-//     right: 10,
+//   statValue:         { color: '#1F2937', fontSize: 22, fontWeight: '700', lineHeight: 26 },
+//   statLabel:         { color: '#6B7280', fontSize: 11, marginTop: 1, fontWeight: '500' },
+
+//   roomCountBadge: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     gap: 3,
+//     marginTop: 5,
+//     backgroundColor: '#F3F0FF',
+//     alignSelf: 'flex-start',
+//     paddingHorizontal: 7,
+//     paddingVertical: 3,
+//     borderRadius: 6,
+//     borderWidth: 1,
+//     borderColor: '#DDD6FE',
 //   },
-//   activeDot: {
-//     width: 8,
-//     height: 8,
-//     borderRadius: 4,
+//   roomCountText: {
+//     fontSize: 10,
+//     fontWeight: '700',
+//     color: '#6B5B95',
 //   },
-  
-//   // Current Tab Display
-//   currentTabContainer: {
-//     paddingHorizontal: 16,
-//     marginBottom: 16,
-//   },
+
+//   activeIndicator:   { position: 'absolute', top: 10, right: 10 },
+//   activeDot:         { width: 8, height: 8, borderRadius: 4 },
+
+//   // Current Tab Badge
+//   currentTabContainer: { paddingHorizontal: 16, marginBottom: 16 },
 //   currentTabBadge: {
 //     flexDirection: 'row',
 //     alignItems: 'center',
@@ -777,137 +926,134 @@
 //     paddingVertical: 4,
 //     borderRadius: 10,
 //   },
-//   currentTabCountText: {
-//     color: '#FFFFFF',
-//     fontSize: 13,
-//     fontWeight: '700',
-//   },
-  
-//   // Loading & Empty States
+//   currentTabCountText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+
+//   // Loading & Empty
 //   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-//   loadingText: { color: '#6B5B95', fontSize: 16, marginTop: 12, fontWeight: '600' },
-//   emptyContainer: { paddingVertical: 60, alignItems: 'center' },
-//   emptyText: { color: '#1F2937', fontSize: 18, fontWeight: '600', marginTop: 16 },
-//   emptySubtext: { color: '#6B7280', fontSize: 14, marginTop: 4 },
-//   listContainer: { paddingBottom: 80 },
-  
-//   // Booking Card Styles
-//   bookingCard: { 
+//   loadingText:      { color: '#6B5B95', fontSize: 16, marginTop: 12, fontWeight: '600' },
+//   emptyContainer:   { paddingVertical: 60, alignItems: 'center' },
+//   emptyText:        { color: '#1F2937', fontSize: 18, fontWeight: '600', marginTop: 16 },
+//   emptySubtext:     { color: '#6B7280', fontSize: 14, marginTop: 4 },
+//   listContainer:    { paddingBottom: 80 },
+
+//   // Booking Card
+//   bookingCard: {
 //     marginHorizontal: 16,
-//     marginBottom: 16, 
-//     borderRadius: 16, 
+//     marginBottom: 16,
+//     borderRadius: 16,
 //     backgroundColor: '#FFFFFF',
 //     padding: 18,
-//     shadowColor: '#000', 
-//     shadowOffset: { width: 0, height: 2 }, 
-//     shadowOpacity: 0.08, 
-//     shadowRadius: 10, 
-//     elevation: 4 
+//     shadowColor: '#000',
+//     shadowOffset: { width: 0, height: 2 },
+//     shadowOpacity: 0.08,
+//     shadowRadius: 10,
+//     elevation: 4,
 //   },
-//   bookingHeader: { 
-//     flexDirection: 'row', 
-//     justifyContent: 'space-between', 
-//     alignItems: 'flex-start', 
-//     marginBottom: 10 
+//   bookingHeader: {
+//     flexDirection: 'row',
+//     justifyContent: 'space-between',
+//     alignItems: 'flex-start',
+//     marginBottom: 10,
 //   },
-//   bookingHeaderLeft: { flex: 1 },
-//   bookingName: { color: '#1F2937', fontSize: 18, fontWeight: '700', marginBottom: 10 },
-//   bookingDateContainer: { 
-//     flexDirection: 'row', 
-//     alignItems: 'center', 
-//     gap: 6, 
-//     marginBottom: 12 
+//   bookingHeaderLeft:   { flex: 1, marginLeft: 10 },
+//   bookingHeaderMeta:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+//   bookingName:         { color: '#1F2937', fontSize: 18, fontWeight: '700' },
+//   bookingDateContainer:{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+//   bookingDateText:     { color: '#6B5B95', fontSize: 12, fontWeight: '500' },
+
+//   // ── NEW: Booking method badge ──────────────────────────────────────────────
+//   bookingMethodBadge: {
+//     alignItems: 'center',
+//     justifyContent: 'center',
+//     backgroundColor: '#F9F7FF',
+//     borderRadius: 12,
+//     borderWidth: 1,
+//     borderColor: '#DDD6FE',
+//     padding: 8,
+//     minWidth: 70,
+//     gap: 4,
 //   },
-//   bookingDateText: { color: '#6B5B95', fontSize: 12, fontWeight: '500' },
-//   statusBadge: { 
-//     alignSelf: 'flex-start', 
-//     paddingHorizontal: 12, 
-//     paddingVertical: 5, 
-//     borderRadius: 8, 
-//     borderWidth: 1.5 
+//   bookingMethodImage: {
+//     width: 40,
+//     height: 40,
+//     borderRadius: 8,
+//   },
+//   bookingMethodText: {
+//     fontSize: 9,
+//     fontWeight: '700',
+//     color: '#6B5B95',
+//     textAlign: 'center',
+//     textTransform: 'uppercase',
+//   },
+
+//   statusBadge: {
+//     alignSelf: 'flex-start',
+//     paddingHorizontal: 12,
+//     paddingVertical: 5,
+//     borderRadius: 8,
+//     borderWidth: 1.5,
 //   },
 //   statusText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
-//   dateRangeBanner: { 
-//     flexDirection: 'row', 
-//     alignItems: 'center', 
-//     justifyContent: 'space-between', 
-//     borderRadius: 12, 
-//     padding: 14, 
+//   dateRangeBanner: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     justifyContent: 'space-between',
+//     borderRadius: 12,
+//     padding: 14,
 //     marginVertical: 12,
 //   },
-//   dateRangeItem: { alignItems: 'center', flex: 1 },
-//   dateRangeLabel: { 
-//     color: '#E9D5FF', 
-//     fontSize: 10, 
-//     fontWeight: '600', 
-//     textTransform: 'uppercase', 
-//     marginBottom: 6 
-//   },
-//   dateRangeDate: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-//   dateRangeTime: { color: '#E9D5FF', fontSize: 11, marginTop: 3, fontWeight: '500' },
-//   nightsBadge: { 
-//     backgroundColor: 'rgba(255, 255, 255, 0.25)', 
-//     borderRadius: 12, 
-//     paddingHorizontal: 16, 
-//     paddingVertical: 10, 
-//     alignItems: 'center', 
+//   dateRangeItem:  { alignItems: 'center', flex: 1 },
+//   dateRangeLabel: { color: '#E9D5FF', fontSize: 10, fontWeight: '600', textTransform: 'uppercase', marginBottom: 6 },
+//   dateRangeDate:  { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+//   dateRangeTime:  { color: '#E9D5FF', fontSize: 11, marginTop: 3, fontWeight: '500' },
+//   nightsBadge: {
+//     backgroundColor: 'rgba(255,255,255,0.25)',
+//     borderRadius: 12,
+//     paddingHorizontal: 16,
+//     paddingVertical: 10,
+//     alignItems: 'center',
 //     marginHorizontal: 10,
 //     borderWidth: 1,
-//     borderColor: 'rgba(255, 255, 255, 0.4)',
+//     borderColor: 'rgba(255,255,255,0.4)',
 //   },
-//   nightsText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
-//   nightsLabel: { 
-//     color: '#FFFFFF', 
-//     fontSize: 9, 
-//     fontWeight: '600', 
-//     textTransform: 'uppercase', 
-//     marginTop: 2 
-//   },
+//   nightsText:  { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
+//   nightsLabel: { color: '#FFFFFF', fontSize: 9, fontWeight: '600', textTransform: 'uppercase', marginTop: 2 },
 //   infoSection: { marginVertical: 12, gap: 8 },
-//   infoRow: { flexDirection: 'row', gap: 8 },
-//   infoItem: { 
-//     flex: 1, 
-//     flexDirection: 'row', 
-//     alignItems: 'center', 
-//     gap: 8, 
-//     backgroundColor: '#F9FAFB', 
-//     padding: 12, 
+//   infoRow:     { flexDirection: 'row', gap: 8 },
+//   infoItem: {
+//     flex: 1,
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     gap: 8,
+//     backgroundColor: '#F9FAFB',
+//     padding: 12,
 //     borderRadius: 10,
 //     borderWidth: 1,
 //     borderColor: '#E5E7EB',
 //   },
-//   infoItemFull: { 
-//     flex: 1, 
-//     flexDirection: 'row', 
-//     alignItems: 'center', 
-//     gap: 8, 
-//     backgroundColor: '#F9FAFB', 
-//     padding: 12, 
+//   infoItemFull: {
+//     flex: 1,
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     gap: 8,
+//     backgroundColor: '#F9FAFB',
+//     padding: 12,
 //     borderRadius: 10,
 //     borderWidth: 1,
 //     borderColor: '#E5E7EB',
 //   },
 //   infoText: { color: '#1F2937', fontSize: 13, fontWeight: '600', flex: 1 },
-//   paymentContainer: { 
-//     backgroundColor: '#F9FAFB', 
-//     borderRadius: 12, 
-//     padding: 14, 
-//     marginTop: 12, 
+//   paymentContainer: {
+//     backgroundColor: '#F9FAFB',
+//     borderRadius: 12,
+//     padding: 14,
+//     marginTop: 12,
 //     gap: 8,
 //     borderWidth: 1,
 //     borderColor: '#E5E7EB',
 //   },
-//   paymentRow: { 
-//     flexDirection: 'row', 
-//     justifyContent: 'space-between', 
-//     alignItems: 'center' 
-//   },
-//   balanceRow: { 
-//     marginTop: 6, 
-//     paddingTop: 12, 
-//     borderTopWidth: 1.5, 
-//     borderTopColor: '#E5E7EB' 
-//   },
+//   paymentRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+//   balanceRow:   { marginTop: 6, paddingTop: 12, borderTopWidth: 1.5, borderTopColor: '#E5E7EB' },
 //   paymentLabel: { color: '#6B7280', fontSize: 13, fontWeight: '600' },
 //   paymentValue: { color: '#1F2937', fontSize: 14, fontWeight: '700' },
 //   tapToViewContainer: {
@@ -920,49 +1066,39 @@
 //     borderTopWidth: 1.5,
 //     borderTopColor: '#E5E7EB',
 //   },
-//   tapToViewText: {
-//     color: '#6B5B95',
-//     fontSize: 13,
-//     fontWeight: '600',
+//   tapToViewText: { color: '#6B5B95', fontSize: 13, fontWeight: '600' },
+
+//   // Modal
+//   modalOverlay: {
+//     flex: 1,
+//     backgroundColor: 'rgba(0,0,0,0.5)',
+//     justifyContent: 'flex-end',
 //   },
-  
-//   // Modal Styles
-//   modalOverlay: { 
-//     flex: 1, 
-//     backgroundColor: 'rgba(0, 0, 0, 0.5)', 
-//     justifyContent: 'flex-end' 
-//   },
-//   modalBackground: { 
-//     position: 'absolute', 
-//     top: 0, 
-//     left: 0, 
-//     right: 0, 
-//     bottom: 0 
-//   },
-//   detailsContainer: { 
-//     backgroundColor: '#FFFFFF', 
-//     borderTopLeftRadius: 24, 
-//     borderTopRightRadius: 24, 
+//   modalBackground: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+//   detailsContainer: {
+//     backgroundColor: '#FFFFFF',
+//     borderTopLeftRadius: 24,
+//     borderTopRightRadius: 24,
 //     maxHeight: '90%',
-//     shadowColor: '#000', 
-//     shadowOffset: { width: 0, height: -4 }, 
-//     shadowOpacity: 0.15, 
-//     shadowRadius: 12, 
-//     elevation: 10 
+//     shadowColor: '#000',
+//     shadowOffset: { width: 0, height: -4 },
+//     shadowOpacity: 0.15,
+//     shadowRadius: 12,
+//     elevation: 10,
 //   },
-//   detailsHeader: { 
-//     flexDirection: 'row', 
-//     justifyContent: 'space-between', 
-//     alignItems: 'center', 
-//     paddingHorizontal: 24, 
-//     paddingVertical: 20, 
-//     borderTopLeftRadius: 24, 
-//     borderTopRightRadius: 24 
+//   detailsHeader: {
+//     flexDirection: 'row',
+//     justifyContent: 'space-between',
+//     alignItems: 'center',
+//     paddingHorizontal: 24,
+//     paddingVertical: 20,
+//     borderTopLeftRadius: 24,
+//     borderTopRightRadius: 24,
 //   },
-//   detailsTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
+//   detailsTitle:  { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
 //   detailsScroll: { maxHeight: 500 },
-//   detailsContent: { padding: 24 },
-//   detailsSection: { 
+//   detailsContent:{ padding: 24 },
+//   detailsSection: {
 //     marginBottom: 24,
 //     backgroundColor: '#F9FAFB',
 //     borderRadius: 12,
@@ -970,33 +1106,32 @@
 //     borderWidth: 1,
 //     borderColor: '#E5E7EB',
 //   },
-//   detailsSectionTitle: { 
-//     fontSize: 16, 
-//     fontWeight: '700', 
-//     color: '#6B5B95', 
+//   detailsSectionTitle: {
+//     fontSize: 16,
+//     fontWeight: '700',
+//     color: '#6B5B95',
 //     marginBottom: 14,
 //     paddingBottom: 10,
 //     borderBottomWidth: 1.5,
 //     borderBottomColor: '#E5E7EB',
 //   },
-//   detailsRow: { 
-//     flexDirection: 'row', 
+//   detailsRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 10 },
+//   detailsLabel:{ fontSize: 13, fontWeight: '600', color: '#6B7280', width: 100 },
+//   detailsValue:{ fontSize: 13, fontWeight: '600', color: '#1F2937', flex: 1 },
+
+//   // ── NEW: Method row inside modal ─────────────────────────────────────────
+//   detailsMethodContainer: {
+//     flexDirection: 'row',
 //     alignItems: 'center',
-//     marginBottom: 12,
-//     gap: 10,
-//   },
-//   detailsLabel: { 
-//     fontSize: 13, 
-//     fontWeight: '600', 
-//     color: '#6B7280',
-//     width: 100,
-//   },
-//   detailsValue: { 
-//     fontSize: 13, 
-//     fontWeight: '600', 
-//     color: '#1F2937',
+//     gap: 8,
 //     flex: 1,
 //   },
+//   detailsMethodImage: {
+//     width: 28,
+//     height: 28,
+//     borderRadius: 6,
+//   },
+
 //   detailsPaymentRow: {
 //     flexDirection: 'row',
 //     justifyContent: 'space-between',
@@ -1009,16 +1144,8 @@
 //     borderTopWidth: 1.5,
 //     borderTopColor: '#E5E7EB',
 //   },
-//   detailsPaymentLabel: {
-//     fontSize: 14,
-//     fontWeight: '600',
-//     color: '#6B7280',
-//   },
-//   detailsPaymentValue: {
-//     fontSize: 15,
-//     fontWeight: '700',
-//     color: '#1F2937',
-//   },
+//   detailsPaymentLabel: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
+//   detailsPaymentValue: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
 //   detailsFooter: {
 //     padding: 24,
 //     paddingTop: 16,
@@ -1042,13 +1169,12 @@
 //     paddingVertical: 16,
 //     gap: 10,
 //   },
-//   detailsActionButtonText: {
-//     color: '#FFFFFF',
-//     fontSize: 16,
-//     fontWeight: '700',
-//   },
+//   detailsActionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 // });
-// app/dashboard/index.tsx
+
+
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
@@ -1064,6 +1190,7 @@ import {
   ScrollView,
   Dimensions,
   Image,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1073,6 +1200,9 @@ import { useNotification } from '@/context/NotificationContext';
 import homeService from '../../services/homeService';
 import { TabType, Booking, BookingData, PaymentInfo, StatusStyle } from './../../types/booking';
 import HeaderWithMenu from '../../components/HeaderWithMenu';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 
 const { width } = Dimensions.get('window');
 
@@ -1125,6 +1255,7 @@ const Home = () => {
   const [refreshing, setRefreshing]         = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -1210,6 +1341,121 @@ const Home = () => {
     loadBookingDetails();
   };
 
+  // ── FIXED: Fetch Invoice PDF from API ──────────────────────────────────────────
+  const fetchInvoicePDF = async (bookingId: number): Promise<{ pdfBase64: string; fileName: string } | null> => {
+    try {
+      const response = await homeService.getHotelInvoice(bookingId);
+      
+      if (response && response.success && response.pdf_base64) {
+        return {
+          pdfBase64: response.pdf_base64,
+          fileName: response.file_name || `invoice_${bookingId}.pdf`,
+        };
+      } else {
+        throw new Error('Invalid response from server');
+      }
+    } catch (error) {
+      console.error('Error fetching invoice:', error);
+      throw error;
+    }
+  };
+
+  // ── FIXED: Save PDF to device and share ─────────────────────────────────────────
+  const downloadAndSharePDF = async (pdfBase64: string, fileName: string) => {
+    try {
+      // Clean the base64 string - remove any data URL prefix if present
+      let base64Data = pdfBase64;
+      
+      // Check if it has a data URL prefix (e.g., "data:application/pdf;base64,")
+      if (pdfBase64.includes('base64,')) {
+        base64Data = pdfBase64.split('base64,')[1];
+      } else if (pdfBase64.includes(',')) {
+        base64Data = pdfBase64.split(',')[1];
+      }
+      
+      // Remove any whitespace or newlines
+      base64Data = base64Data.replace(/\s/g, '');
+      
+      // Create a unique file path
+      const fileUri = FileSystem.documentDirectory + `${Date.now()}_${fileName}`;
+      
+      // Write the base64 string to a file - FIXED: Use string 'base64' instead of EncodingType.Base64
+      await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+        encoding: 'base64',
+      });
+      
+      // Check if the file was created successfully
+      const fileInfo = await FileSystem.getInfoAsync(fileUri);
+      if (!fileInfo.exists) {
+        throw new Error('Failed to create PDF file');
+      }
+      
+      // Check if sharing is available on the device
+      const isSharingAvailable = await Sharing.isAvailableAsync();
+      
+      if (isSharingAvailable) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Share Invoice',
+          UTI: 'com.adobe.pdf', // iOS specific
+        });
+      } else {
+        // Fallback for devices without sharing capability
+        Alert.alert(
+          'File Saved',
+          `PDF saved to: ${fileUri}`,
+          [{ text: 'OK' }]
+        );
+      }
+      
+      return fileUri;
+    } catch (error) {
+      console.error('Error sharing PDF:', error);
+      throw error;
+    }
+  };
+
+  // ── FIXED: Handle Print Invoice Button Press ─────────────────────────────────────
+  const handlePrintInvoice = async (bookingId: number) => {
+    setInvoiceLoading(true);
+    
+    try {
+      // Show loading indicator
+      Alert.alert(
+        'Processing',
+        'Generating invoice...',
+        [{ text: 'OK' }],
+        { cancelable: false }
+      );
+      
+      // Fetch the PDF from API
+      const invoiceData = await fetchInvoicePDF(bookingId);
+      
+      if (invoiceData && invoiceData.pdfBase64) {
+        // Download and share the PDF
+        await downloadAndSharePDF(invoiceData.pdfBase64, invoiceData.fileName);
+        
+        // Success message
+        Alert.alert(
+          'Success',
+          'Invoice PDF has been downloaded and is ready to share!',
+          [{ text: 'OK' }]
+        );
+      } else {
+        throw new Error('No PDF data received from server');
+      }
+    } catch (error) {
+      console.error('Error in handlePrintInvoice:', error);
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to generate invoice. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setInvoiceLoading(false);
+    }
+  };
+
   const getCurrentBookings = (): Booking[] => {
     if (!bookingData || !bookingData.details) return [];
     return bookingData.details[activeTab] || [];
@@ -1251,6 +1497,7 @@ const Home = () => {
 
   const getPaymentInfo = (booking: Booking): PaymentInfo => {
     const total = booking.total_amount || 0;
+   
     if (booking.reservation) {
       const advancePayment = parseFloat(booking.reservation.advance_payment || '0');
       return {
@@ -1261,7 +1508,7 @@ const Home = () => {
     }
     return {
       total:   total.toFixed(2),
-      paid:    '0.00',
+      paid:     '0.00',
       balance: total.toFixed(2),
     };
   };
@@ -1475,6 +1722,7 @@ const Home = () => {
               <Text style={[s.paymentLabel, { color: '#10B981' }]}>Paid</Text>
               <Text style={[s.paymentValue, { color: '#10B981' }]}>LKR {paymentInfo.paid}</Text>
             </View>
+        
             <View style={[s.paymentRow, s.balanceRow]}>
               <Text style={[s.paymentLabel, { color: '#EF4444', fontWeight: '700' }]}>Balance Due</Text>
               <Text style={[s.paymentValue, { color: '#EF4444', fontWeight: '700' }]}>LKR {paymentInfo.balance}</Text>
@@ -1660,11 +1908,26 @@ const Home = () => {
               </View>
             </ScrollView>
 
+            {/* ── UPDATED: Print Invoice Button with Loading State ── */}
             <View style={s.detailsFooter}>
-              <TouchableOpacity style={s.detailsActionButton}>
-                <LinearGradient colors={['#C9A965', '#D4B87A']} style={s.detailsActionButtonGradient}>
-                  <Ionicons name="print-outline" size={20} color="#FFFFFF" />
-                  <Text style={s.detailsActionButtonText}>Print Invoice</Text>
+              <TouchableOpacity 
+                style={s.detailsActionButton}
+                onPress={() => handlePrintInvoice(selectedBooking.id)}
+                disabled={invoiceLoading}
+                activeOpacity={0.8}
+              >
+                <LinearGradient 
+                  colors={invoiceLoading ? ['#A0A0A0', '#B0B0B0'] : ['#C9A965', '#D4B87A']} 
+                  style={s.detailsActionButtonGradient}
+                >
+                  {invoiceLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="print-outline" size={20} color="#FFFFFF" />
+                      <Text style={s.detailsActionButtonText}>Download & Share Invoice</Text>
+                    </>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
             </View>

@@ -82,7 +82,13 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       icon: 'bed',
       route: '/nav/house_keeping',
     },
-    
+    {
+      id: 'lost-found',
+      title: 'Lost & Found',
+      icon: 'search',
+      route: '/nav/lost_found',
+    },
+        
     
   ];
 
